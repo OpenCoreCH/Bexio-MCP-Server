@@ -439,3 +439,211 @@ class BexioClient:
     async def search_items(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search items with criteria."""
         return await self.post("/article/search", {"criteria": criteria})
+
+    # ==================== ACCOUNTING METHODS ====================
+
+    # Account methods (Chart of Accounts)
+    async def list_accounts(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of accounts from the chart of accounts."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+
+        return await self.get("/accounts", params=params)
+
+    async def get_account(self, account_id: int) -> Dict[str, Any]:
+        """Fetch a specific account."""
+        return await self.get(f"/accounts/{account_id}")
+
+    async def search_accounts(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Search accounts with criteria."""
+        return await self.post("/accounts/search", criteria)
+
+    # Account Group methods
+    async def list_account_groups(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of account groups."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/account_groups", params=params)
+
+    async def get_account_group(self, account_group_id: int) -> Dict[str, Any]:
+        """Fetch a specific account group."""
+        return await self.get(f"/account_groups/{account_group_id}")
+
+    # Tax methods
+    async def list_taxes(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of taxes."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/taxes", params=params)
+
+    async def get_tax(self, tax_id: int) -> Dict[str, Any]:
+        """Fetch a specific tax."""
+        return await self.get(f"/taxes/{tax_id}")
+
+    # Currency methods
+    async def list_currencies(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of currencies."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/currencies", params=params)
+
+    async def get_currency(self, currency_id: int) -> Dict[str, Any]:
+        """Fetch a specific currency."""
+        return await self.get(f"/currencies/{currency_id}")
+
+    async def create_currency(self, currency_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new currency."""
+        return await self.post("/currencies", currency_data)
+
+    async def get_exchange_rates(self, date: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Fetch exchange rates for currencies."""
+        params = {}
+        if date is not None:
+            params["date"] = date
+        return await self.get("/currencies/exchange_rates", params=params)
+
+    # Manual Entry / Accounting Journal methods
+    async def list_manual_entries(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of manual entries (accounting journal)."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+
+        return await self.get("/accounting_journal", params=params)
+
+    async def get_manual_entry(self, entry_id: int) -> Dict[str, Any]:
+        """Fetch a specific manual entry."""
+        return await self.get(f"/accounting_journal/{entry_id}")
+
+    async def create_manual_entry(self, entry_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new manual entry (accounting journal booking).
+
+        Required fields:
+        - date: Booking date (YYYY-MM-DD format)
+        - debit_account_id: Debit account ID
+        - credit_account_id: Credit account ID
+        - amount: Booking amount
+
+        Optional fields:
+        - tax_id: Tax ID for VAT
+        - text: Description/reference text
+        - reference_nr: Reference number
+        """
+        return await self.post("/accounting_journal", entry_data)
+
+    async def get_next_reference_number(self) -> Dict[str, Any]:
+        """Get the next available reference number for manual entries."""
+        return await self.get("/accounting_journal/reference_number")
+
+    # Business Year methods
+    async def list_business_years(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of business years."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/business_years", params=params)
+
+    async def get_business_year(self, business_year_id: int) -> Dict[str, Any]:
+        """Fetch a specific business year."""
+        return await self.get(f"/business_years/{business_year_id}")
+
+    # Calendar Year methods
+    async def list_calendar_years(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of calendar years."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/calendar_years", params=params)
+
+    async def get_calendar_year(self, calendar_year_id: int) -> Dict[str, Any]:
+        """Fetch a specific calendar year."""
+        return await self.get(f"/calendar_years/{calendar_year_id}")
+
+    async def create_calendar_year(self, calendar_year_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new calendar year.
+
+        Required fields:
+        - start: Start date (YYYY-MM-DD format)
+        - end: End date (YYYY-MM-DD format)
+        """
+        return await self.post("/calendar_years", calendar_year_data)
+
+    async def search_calendar_years(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Search calendar years with criteria."""
+        return await self.post("/calendar_years/search", criteria)
+
+    # VAT Period methods
+    async def list_vat_periods(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of VAT periods."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/vat_periods", params=params)
+
+    async def get_vat_period(self, vat_period_id: int) -> Dict[str, Any]:
+        """Fetch a specific VAT period."""
+        return await self.get(f"/vat_periods/{vat_period_id}")

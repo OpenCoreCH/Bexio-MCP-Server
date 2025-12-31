@@ -505,6 +505,298 @@ async def list_tools() -> List[Tool]:
                 },
                 "required": ["item_data"]
             }
+        ),
+        # ==================== ACCOUNTING TOOLS ====================
+        # Accounts (Chart of Accounts)
+        Tool(
+            name="list_accounts",
+            description="List all accounts from the chart of accounts. AUTO-FILLED: limit=50, offset=0. Optional: order_by.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by"}
+                }
+            }
+        ),
+        Tool(
+            name="get_account",
+            description="Get detailed information about a specific account. REQUIRED: account_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "account_id": {"type": "integer", "description": "Account ID"}
+                },
+                "required": ["account_id"]
+            }
+        ),
+        Tool(
+            name="search_accounts",
+            description="Search for accounts in Bexio using specific criteria. REQUIRED: criteria array with field/value/criteria objects.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "criteria": {
+                        "type": "array",
+                        "description": "Search criteria array - each item must have field, value, and criteria",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {"type": "string", "description": "Field to search (e.g., 'account_no', 'name')"},
+                                "value": {"type": "string", "description": "Search value"},
+                                "criteria": {"type": "string", "description": "Search criteria: 'like', '=', '!=', etc.", "default": "like"}
+                            },
+                            "required": ["field", "value", "criteria"]
+                        }
+                    }
+                },
+                "required": ["criteria"]
+            }
+        ),
+        # Account Groups
+        Tool(
+            name="list_account_groups",
+            description="List all account groups. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_account_group",
+            description="Get detailed information about a specific account group. REQUIRED: account_group_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "account_group_id": {"type": "integer", "description": "Account Group ID"}
+                },
+                "required": ["account_group_id"]
+            }
+        ),
+        # Taxes
+        Tool(
+            name="list_taxes",
+            description="List all taxes configured in Bexio. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_tax",
+            description="Get detailed information about a specific tax. REQUIRED: tax_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tax_id": {"type": "integer", "description": "Tax ID"}
+                },
+                "required": ["tax_id"]
+            }
+        ),
+        # Currencies
+        Tool(
+            name="list_currencies",
+            description="List all currencies configured in Bexio. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_currency",
+            description="Get detailed information about a specific currency. REQUIRED: currency_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "currency_id": {"type": "integer", "description": "Currency ID"}
+                },
+                "required": ["currency_id"]
+            }
+        ),
+        Tool(
+            name="create_currency",
+            description="Create a new currency in Bexio. REQUIRED: name, round_factor.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "currency_data": {
+                        "type": "object",
+                        "description": "Currency data",
+                        "properties": {
+                            "name": {"type": "string", "description": "REQUIRED: Currency code (e.g., 'EUR', 'USD')"},
+                            "round_factor": {"type": "number", "description": "REQUIRED: Rounding factor (e.g., 0.05 for CHF)"}
+                        },
+                        "required": ["name", "round_factor"]
+                    }
+                },
+                "required": ["currency_data"]
+            }
+        ),
+        Tool(
+            name="get_exchange_rates",
+            description="Get exchange rates for currencies. Optional: date parameter for historical rates.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "Date for exchange rates (YYYY-MM-DD format). Defaults to current date."}
+                }
+            }
+        ),
+        # Manual Entries / Accounting Journal
+        Tool(
+            name="list_manual_entries",
+            description="List all manual entries (accounting journal bookings). AUTO-FILLED: limit=50, offset=0. Optional: order_by.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by"}
+                }
+            }
+        ),
+        Tool(
+            name="get_manual_entry",
+            description="Get detailed information about a specific manual entry. REQUIRED: entry_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entry_id": {"type": "integer", "description": "Manual Entry ID"}
+                },
+                "required": ["entry_id"]
+            }
+        ),
+        Tool(
+            name="create_manual_entry",
+            description="Create a new manual entry (accounting journal booking). REQUIRED: date, debit_account_id, credit_account_id, amount. Optional: tax_id, text, reference_nr.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entry_data": {
+                        "type": "object",
+                        "description": "Manual entry data",
+                        "properties": {
+                            "date": {"type": "string", "description": "REQUIRED: Booking date (YYYY-MM-DD format)"},
+                            "debit_account_id": {"type": "integer", "description": "REQUIRED: Debit account ID (from chart of accounts)"},
+                            "credit_account_id": {"type": "integer", "description": "REQUIRED: Credit account ID (from chart of accounts)"},
+                            "amount": {"type": "number", "description": "REQUIRED: Booking amount"},
+                            "tax_id": {"type": "integer", "description": "Tax ID for VAT (optional)"},
+                            "text": {"type": "string", "description": "Description/reference text (optional)"},
+                            "reference_nr": {"type": "string", "description": "Reference number (optional, auto-generated if missing)"},
+                            "currency_id": {"type": "integer", "description": "Currency ID (optional, defaults to base currency)"},
+                            "currency_factor": {"type": "number", "description": "Exchange rate factor (optional)"}
+                        },
+                        "required": ["date", "debit_account_id", "credit_account_id", "amount"]
+                    }
+                },
+                "required": ["entry_data"]
+            }
+        ),
+        Tool(
+            name="get_next_reference_number",
+            description="Get the next available reference number for manual entries.",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        # Business Years
+        Tool(
+            name="list_business_years",
+            description="List all business years. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_business_year",
+            description="Get detailed information about a specific business year. REQUIRED: business_year_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "business_year_id": {"type": "integer", "description": "Business Year ID"}
+                },
+                "required": ["business_year_id"]
+            }
+        ),
+        # Calendar Years
+        Tool(
+            name="list_calendar_years",
+            description="List all calendar years. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_calendar_year",
+            description="Get detailed information about a specific calendar year. REQUIRED: calendar_year_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "calendar_year_id": {"type": "integer", "description": "Calendar Year ID"}
+                },
+                "required": ["calendar_year_id"]
+            }
+        ),
+        Tool(
+            name="create_calendar_year",
+            description="Create a new calendar year. REQUIRED: start, end dates.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "calendar_year_data": {
+                        "type": "object",
+                        "description": "Calendar year data",
+                        "properties": {
+                            "start": {"type": "string", "description": "REQUIRED: Start date (YYYY-MM-DD format)"},
+                            "end": {"type": "string", "description": "REQUIRED: End date (YYYY-MM-DD format)"}
+                        },
+                        "required": ["start", "end"]
+                    }
+                },
+                "required": ["calendar_year_data"]
+            }
+        ),
+        # VAT Periods
+        Tool(
+            name="list_vat_periods",
+            description="List all VAT periods. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_vat_period",
+            description="Get detailed information about a specific VAT period. REQUIRED: vat_period_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "vat_period_id": {"type": "integer", "description": "VAT Period ID"}
+                },
+                "required": ["vat_period_id"]
+            }
         )
     ]
 
@@ -625,7 +917,136 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             item_data = arguments["item_data"]
             result = await client.create_item(item_data)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
-        
+
+        # ==================== ACCOUNTING TOOL HANDLERS ====================
+
+        # Accounts (Chart of Accounts)
+        elif name == "list_accounts":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.list_accounts(limit=limit, offset=offset, order_by=order_by)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_account":
+            account_id = arguments["account_id"]
+            result = await client.get_account(account_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "search_accounts":
+            criteria = arguments.get("criteria", [])
+            result = await client.search_accounts(criteria)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Account Groups
+        elif name == "list_account_groups":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_account_groups(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_account_group":
+            account_group_id = arguments["account_group_id"]
+            result = await client.get_account_group(account_group_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Taxes
+        elif name == "list_taxes":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_taxes(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_tax":
+            tax_id = arguments["tax_id"]
+            result = await client.get_tax(tax_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Currencies
+        elif name == "list_currencies":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_currencies(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_currency":
+            currency_id = arguments["currency_id"]
+            result = await client.get_currency(currency_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "create_currency":
+            currency_data = arguments["currency_data"]
+            result = await client.create_currency(currency_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_exchange_rates":
+            date = arguments.get("date")
+            result = await client.get_exchange_rates(date=date)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Manual Entries / Accounting Journal
+        elif name == "list_manual_entries":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.list_manual_entries(limit=limit, offset=offset, order_by=order_by)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_manual_entry":
+            entry_id = arguments["entry_id"]
+            result = await client.get_manual_entry(entry_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "create_manual_entry":
+            entry_data = arguments["entry_data"]
+            result = await client.create_manual_entry(entry_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_next_reference_number":
+            result = await client.get_next_reference_number()
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Business Years
+        elif name == "list_business_years":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_business_years(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_business_year":
+            business_year_id = arguments["business_year_id"]
+            result = await client.get_business_year(business_year_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Calendar Years
+        elif name == "list_calendar_years":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_calendar_years(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_calendar_year":
+            calendar_year_id = arguments["calendar_year_id"]
+            result = await client.get_calendar_year(calendar_year_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "create_calendar_year":
+            calendar_year_data = arguments["calendar_year_data"]
+            result = await client.create_calendar_year(calendar_year_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # VAT Periods
+        elif name == "list_vat_periods":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_vat_periods(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_vat_period":
+            vat_period_id = arguments["vat_period_id"]
+            result = await client.get_vat_period(vat_period_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
         else:
             return [TextContent(type="text", text=f"Unknown tool: {name}")]
     
