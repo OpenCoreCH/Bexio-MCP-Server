@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 class BexioConfig(BaseModel):
     """Configuration for Bexio connection."""
 
-    api_url: str = Field(default="https://api.bexio.com/2.0", description="Bexio API base URL")
+    api_url: str = Field(default="https://api.bexio.com", description="Bexio API base URL (without version)")
     access_token: str = Field(..., description="Bexio OAuth access token")
     timeout: int = Field(120, description="Request timeout in seconds")
 
@@ -173,11 +173,11 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
         
-        return await self.get("/contact", params=params)
+        return await self.get("/2.0/contact", params=params)
 
     async def get_contact(self, contact_id: int) -> Dict[str, Any]:
         """Fetch a specific contact."""
-        return await self.get(f"/contact/{contact_id}")
+        return await self.get(f"/2.0/contact/{contact_id}")
 
     async def create_contact(self, contact_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new contact."""
@@ -185,7 +185,7 @@ class BexioClient:
         # Map common alias 'email' -> 'mail' expected by Bexio
         if "email" in normalized and "mail" not in normalized:
             normalized["mail"] = normalized.pop("email")
-        return await self.post("/contact", normalized)
+        return await self.post("/2.0/contact", normalized)
 
     async def update_contact(
         self, contact_id: int, contact_data: Dict[str, Any]
@@ -198,18 +198,18 @@ class BexioClient:
         try:
             existing = await self.get_contact(contact_id)
             merged: Dict[str, Any] = {**existing, **normalized}
-            return await self.put(f"/contact/{contact_id}", merged)
+            return await self.put(f"/2.0/contact/{contact_id}", merged)
         except Exception:
             # Fallback: attempt update with provided fields only
-            return await self.put(f"/contact/{contact_id}", normalized)
+            return await self.put(f"/2.0/contact/{contact_id}", normalized)
 
     async def delete_contact(self, contact_id: int) -> None:
         """Delete a contact."""
-        await self.delete(f"/contact/{contact_id}")
+        await self.delete(f"/2.0/contact/{contact_id}")
 
     async def search_contacts(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search contacts with criteria."""
-        return await self.post("/contact/search", criteria)
+        return await self.post("/2.0/contact/search", criteria)
 
     # Invoice methods
     async def list_invoices(
@@ -227,11 +227,11 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
         
-        return await self.get("/kb_invoice", params=params)
+        return await self.get("/2.0/kb_invoice", params=params)
 
     async def get_invoice(self, invoice_id: int) -> Dict[str, Any]:
         """Fetch a specific invoice."""
-        return await self.get(f"/kb_invoice/{invoice_id}")
+        return await self.get(f"/2.0/kb_invoice/{invoice_id}")
 
     async def create_invoice(self, invoice_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new invoice."""
@@ -244,17 +244,17 @@ class BexioClient:
                 "Invoice requires at least one position. Provide positions=[{" 
                 "\"type\": \"KbPositionCustom\", \"text\": \"Item description\", \"amount\": 1, \"unit_price\": 10.0}]"
             )
-        return await self.post("/kb_invoice", invoice_data)
+        return await self.post("/2.0/kb_invoice", invoice_data)
 
     async def update_invoice(
         self, invoice_id: int, invoice_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing invoice."""
-        return await self.put(f"/kb_invoice/{invoice_id}", invoice_data)
+        return await self.put(f"/2.0/kb_invoice/{invoice_id}", invoice_data)
 
     async def delete_invoice(self, invoice_id: int) -> None:
         """Delete an invoice."""
-        await self.delete(f"/kb_invoice/{invoice_id}")
+        await self.delete(f"/2.0/kb_invoice/{invoice_id}")
 
     async def search_invoices(self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200) -> List[Dict[str, Any]]:
         """Search invoices with criteria.
@@ -263,11 +263,11 @@ class BexioClient:
         fetching a batch and filtering client-side using '=' and 'like'.
         """
         try:
-            return await self.post("/kb_invoice/search", criteria)
+            return await self.post("/2.0/kb_invoice/search", criteria)
         except ValueError as e:
             # Try alternate payload shape {"criteria": [...]} in case of schema variance
             try:
-                return await self.post("/kb_invoice/search", {"criteria": criteria})
+                return await self.post("/2.0/kb_invoice/search", {"criteria": criteria})
             except ValueError:
                 # Fallback to client-side filtering
                 batch = await self.list_invoices(limit=fallback_limit)
@@ -289,33 +289,33 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
         
-        return await self.get("/kb_offer", params=params)
+        return await self.get("/2.0/kb_offer", params=params)
 
     async def get_quote(self, quote_id: int) -> Dict[str, Any]:
         """Fetch a specific quote."""
-        return await self.get(f"/kb_offer/{quote_id}")
+        return await self.get(f"/2.0/kb_offer/{quote_id}")
 
     async def create_quote(self, quote_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new quote."""
-        return await self.post("/kb_offer", quote_data)
+        return await self.post("/2.0/kb_offer", quote_data)
 
     async def update_quote(
         self, quote_id: int, quote_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing quote."""
-        return await self.put(f"/kb_offer/{quote_id}", quote_data)
+        return await self.put(f"/2.0/kb_offer/{quote_id}", quote_data)
 
     async def delete_quote(self, quote_id: int) -> None:
         """Delete a quote."""
-        await self.delete(f"/kb_offer/{quote_id}")
+        await self.delete(f"/2.0/kb_offer/{quote_id}")
 
     async def search_quotes(self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200) -> List[Dict[str, Any]]:
         """Search quotes with criteria with robust fallbacks (see search_invoices)."""
         try:
-            return await self.post("/kb_offer/search", criteria)
+            return await self.post("/2.0/kb_offer/search", criteria)
         except ValueError:
             try:
-                return await self.post("/kb_offer/search", {"criteria": criteria})
+                return await self.post("/2.0/kb_offer/search", {"criteria": criteria})
             except ValueError:
                 batch = await self.list_quotes(limit=fallback_limit)
                 return self._filter_by_criteria(batch, criteria)
@@ -336,29 +336,29 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
         
-        return await self.get("/kb_order", params=params)
+        return await self.get("/2.0/kb_order", params=params)
 
     async def get_order(self, order_id: int) -> Dict[str, Any]:
         """Fetch a specific order."""
-        return await self.get(f"/kb_order/{order_id}")
+        return await self.get(f"/2.0/kb_order/{order_id}")
 
     async def create_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new order."""
-        return await self.post("/kb_order", order_data)
+        return await self.post("/2.0/kb_order", order_data)
 
     async def update_order(
         self, order_id: int, order_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing order."""
-        return await self.put(f"/kb_order/{order_id}", order_data)
+        return await self.put(f"/2.0/kb_order/{order_id}", order_data)
 
     async def delete_order(self, order_id: int) -> None:
         """Delete an order."""
-        await self.delete(f"/kb_order/{order_id}")
+        await self.delete(f"/2.0/kb_order/{order_id}")
 
     async def search_orders(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search orders with criteria."""
-        return await self.post("/kb_order/search", {"criteria": criteria})
+        return await self.post("/2.0/kb_order/search", {"criteria": criteria})
 
     # Project methods
     async def list_projects(
@@ -376,29 +376,29 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
         
-        return await self.get("/pr_project", params=params)
+        return await self.get("/2.0/pr_project", params=params)
 
     async def get_project(self, project_id: int) -> Dict[str, Any]:
         """Fetch a specific project."""
-        return await self.get(f"/pr_project/{project_id}")
+        return await self.get(f"/2.0/pr_project/{project_id}")
 
     async def create_project(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new project."""
-        return await self.post("/pr_project", project_data)
+        return await self.post("/2.0/pr_project", project_data)
 
     async def update_project(
         self, project_id: int, project_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing project."""
-        return await self.put(f"/pr_project/{project_id}", project_data)
+        return await self.put(f"/2.0/pr_project/{project_id}", project_data)
 
     async def delete_project(self, project_id: int) -> None:
         """Delete a project."""
-        await self.delete(f"/pr_project/{project_id}")
+        await self.delete(f"/2.0/pr_project/{project_id}")
 
     async def search_projects(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search projects with criteria."""
-        return await self.post("/pr_project/search", {"criteria": criteria})
+        return await self.post("/2.0/pr_project/search", {"criteria": criteria})
 
     # Item methods
     async def list_items(
@@ -416,29 +416,29 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
         
-        return await self.get("/article", params=params)
+        return await self.get("/2.0/article", params=params)
 
     async def get_item(self, item_id: int) -> Dict[str, Any]:
         """Fetch a specific item."""
-        return await self.get(f"/article/{item_id}")
+        return await self.get(f"/2.0/article/{item_id}")
 
     async def create_item(self, item_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new item."""
-        return await self.post("/article", item_data)
+        return await self.post("/2.0/article", item_data)
 
     async def update_item(
         self, item_id: int, item_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing item."""
-        return await self.put(f"/article/{item_id}", item_data)
+        return await self.put(f"/2.0/article/{item_id}", item_data)
 
     async def delete_item(self, item_id: int) -> None:
         """Delete an item."""
-        await self.delete(f"/article/{item_id}")
+        await self.delete(f"/2.0/article/{item_id}")
 
     async def search_items(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search items with criteria."""
-        return await self.post("/article/search", {"criteria": criteria})
+        return await self.post("/2.0/article/search", {"criteria": criteria})
 
     # ==================== ACCOUNTING METHODS ====================
 
@@ -458,15 +458,15 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
 
-        return await self.get("/accounts", params=params)
+        return await self.get("/2.0/accounts", params=params)
 
     async def get_account(self, account_id: int) -> Dict[str, Any]:
         """Fetch a specific account."""
-        return await self.get(f"/accounts/{account_id}")
+        return await self.get(f"/2.0/accounts/{account_id}")
 
     async def search_accounts(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search accounts with criteria."""
-        return await self.post("/accounts/search", criteria)
+        return await self.post("/2.0/accounts/search", criteria)
 
     # Account Group methods
     async def list_account_groups(
@@ -481,11 +481,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/account_groups", params=params)
+        return await self.get("/2.0/account_groups", params=params)
 
     async def get_account_group(self, account_group_id: int) -> Dict[str, Any]:
         """Fetch a specific account group."""
-        return await self.get(f"/account_groups/{account_group_id}")
+        return await self.get(f"/2.0/account_groups/{account_group_id}")
 
     # Tax methods
     async def list_taxes(
@@ -500,11 +500,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/taxes", params=params)
+        return await self.get("/3.0/taxes", params=params)
 
     async def get_tax(self, tax_id: int) -> Dict[str, Any]:
         """Fetch a specific tax."""
-        return await self.get(f"/taxes/{tax_id}")
+        return await self.get(f"/3.0/taxes/{tax_id}")
 
     # Currency methods
     async def list_currencies(
@@ -519,22 +519,22 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/currencies", params=params)
+        return await self.get("/3.0/currencies", params=params)
 
     async def get_currency(self, currency_id: int) -> Dict[str, Any]:
         """Fetch a specific currency."""
-        return await self.get(f"/currencies/{currency_id}")
+        return await self.get(f"/3.0/currencies/{currency_id}")
 
     async def create_currency(self, currency_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new currency."""
-        return await self.post("/currencies", currency_data)
+        return await self.post("/3.0/currencies", currency_data)
 
     async def get_exchange_rates(self, date: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch exchange rates for currencies."""
         params = {}
         if date is not None:
             params["date"] = date
-        return await self.get("/currencies/exchange_rates", params=params)
+        return await self.get("/3.0/currencies/exchange_rates", params=params)
 
     # Manual Entry / Accounting Journal methods
     async def list_manual_entries(
@@ -552,11 +552,11 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
 
-        return await self.get("/accounting_journal", params=params)
+        return await self.get("/3.0/accounting/manual_entries", params=params)
 
     async def get_manual_entry(self, entry_id: int) -> Dict[str, Any]:
         """Fetch a specific manual entry."""
-        return await self.get(f"/accounting_journal/{entry_id}")
+        return await self.get(f"/3.0/accounting/manual_entries/{entry_id}")
 
     async def create_manual_entry(self, entry_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new manual entry (accounting journal booking).
@@ -572,11 +572,11 @@ class BexioClient:
         - text: Description/reference text
         - reference_nr: Reference number
         """
-        return await self.post("/accounting_journal", entry_data)
+        return await self.post("/3.0/accounting/manual_entries", entry_data)
 
     async def get_next_reference_number(self) -> Dict[str, Any]:
         """Get the next available reference number for manual entries."""
-        return await self.get("/accounting_journal/reference_number")
+        return await self.get("/3.0/accounting/manual_entries/reference_number")
 
     # Business Year methods
     async def list_business_years(
@@ -591,11 +591,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/business_years", params=params)
+        return await self.get("/3.0/accounting/business_years", params=params)
 
     async def get_business_year(self, business_year_id: int) -> Dict[str, Any]:
         """Fetch a specific business year."""
-        return await self.get(f"/business_years/{business_year_id}")
+        return await self.get(f"/3.0/accounting/business_years/{business_year_id}")
 
     # Calendar Year methods
     async def list_calendar_years(
@@ -610,11 +610,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/calendar_years", params=params)
+        return await self.get("/3.0/accounting/calendar_years", params=params)
 
     async def get_calendar_year(self, calendar_year_id: int) -> Dict[str, Any]:
         """Fetch a specific calendar year."""
-        return await self.get(f"/calendar_years/{calendar_year_id}")
+        return await self.get(f"/3.0/accounting/calendar_years/{calendar_year_id}")
 
     async def create_calendar_year(self, calendar_year_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new calendar year.
@@ -623,11 +623,11 @@ class BexioClient:
         - start: Start date (YYYY-MM-DD format)
         - end: End date (YYYY-MM-DD format)
         """
-        return await self.post("/calendar_years", calendar_year_data)
+        return await self.post("/3.0/accounting/calendar_years", calendar_year_data)
 
     async def search_calendar_years(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search calendar years with criteria."""
-        return await self.post("/calendar_years/search", criteria)
+        return await self.post("/3.0/accounting/calendar_years/search", criteria)
 
     # VAT Period methods
     async def list_vat_periods(
@@ -642,11 +642,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/vat_periods", params=params)
+        return await self.get("/3.0/accounting/vat_periods", params=params)
 
     async def get_vat_period(self, vat_period_id: int) -> Dict[str, Any]:
         """Fetch a specific VAT period."""
-        return await self.get(f"/vat_periods/{vat_period_id}")
+        return await self.get(f"/3.0/accounting/vat_periods/{vat_period_id}")
 
     # ==================== TIMESHEET METHODS ====================
 
@@ -666,11 +666,11 @@ class BexioClient:
         if order_by is not None:
             params["order_by"] = order_by
 
-        return await self.get("/timesheet", params=params)
+        return await self.get("/2.0/timesheet", params=params)
 
     async def get_timesheet(self, timesheet_id: int) -> Dict[str, Any]:
         """Fetch a specific timesheet."""
-        return await self.get(f"/timesheet/{timesheet_id}")
+        return await self.get(f"/2.0/timesheet/{timesheet_id}")
 
     async def create_timesheet(self, timesheet_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new timesheet entry.
@@ -688,17 +688,17 @@ class BexioClient:
         - pr_project_id: Project ID
         - tracking_type: Type of tracking (0 or 1)
         """
-        return await self.post("/timesheet", timesheet_data)
+        return await self.post("/2.0/timesheet", timesheet_data)
 
     async def search_timesheets(
         self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200
     ) -> List[Dict[str, Any]]:
         """Search timesheets with criteria."""
         try:
-            return await self.post("/timesheet/search", criteria)
+            return await self.post("/2.0/timesheet/search", criteria)
         except ValueError:
             try:
-                return await self.post("/timesheet/search", {"criteria": criteria})
+                return await self.post("/2.0/timesheet/search", {"criteria": criteria})
             except ValueError:
                 batch = await self.list_timesheets(limit=fallback_limit)
                 return self._filter_by_criteria(batch, criteria)
@@ -706,11 +706,11 @@ class BexioClient:
     # Timesheet Status methods
     async def list_timesheet_statuses(self) -> List[Dict[str, Any]]:
         """Fetch a list of timesheet statuses."""
-        return await self.get("/timesheet_status")
+        return await self.get("/2.0/timesheet_status")
 
     async def get_timesheet_status(self, status_id: int) -> Dict[str, Any]:
         """Fetch a specific timesheet status."""
-        return await self.get(f"/timesheet_status/{status_id}")
+        return await self.get(f"/2.0/timesheet_status/{status_id}")
 
     # Client Service methods
     async def list_client_services(
@@ -725,11 +725,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/client_service", params=params)
+        return await self.get("/2.0/client_service", params=params)
 
     async def get_client_service(self, client_service_id: int) -> Dict[str, Any]:
         """Fetch a specific client service."""
-        return await self.get(f"/client_service/{client_service_id}")
+        return await self.get(f"/2.0/client_service/{client_service_id}")
 
     async def create_client_service(self, client_service_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new client service.
@@ -738,11 +738,11 @@ class BexioClient:
         - name: Service name
         - contact_id: Contact ID
         """
-        return await self.post("/client_service", client_service_data)
+        return await self.post("/2.0/client_service", client_service_data)
 
     async def search_client_services(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search client services with criteria."""
-        return await self.post("/client_service/search", criteria)
+        return await self.post("/2.0/client_service/search", criteria)
 
     # Business Activity methods
     async def list_business_activities(
@@ -757,11 +757,11 @@ class BexioClient:
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/business_activity", params=params)
+        return await self.get("/2.0/business_activity", params=params)
 
     async def get_business_activity(self, business_activity_id: int) -> Dict[str, Any]:
         """Fetch a specific business activity."""
-        return await self.get(f"/business_activity/{business_activity_id}")
+        return await self.get(f"/2.0/business_activity/{business_activity_id}")
 
     async def create_business_activity(self, business_activity_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new business activity.
@@ -769,8 +769,8 @@ class BexioClient:
         Required fields:
         - name: Activity name
         """
-        return await self.post("/business_activity", business_activity_data)
+        return await self.post("/2.0/business_activity", business_activity_data)
 
     async def search_business_activities(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Search business activities with criteria."""
-        return await self.post("/business_activity/search", criteria)
+        return await self.post("/2.0/business_activity/search", criteria)

@@ -108,7 +108,7 @@ async def get_bexio_client() -> BexioClient:
         try:
             config = BexioConfig(
                 access_token=os.getenv("BEXIO_ACCESS_TOKEN", "").strip(),
-                api_url=os.getenv("BEXIO_API_URL", "https://api.bexio.com/2.0"),
+                api_url=os.getenv("BEXIO_API_URL", "https://api.bexio.com"),
                 timeout=int(os.getenv("BEXIO_TIMEOUT", "120")),
             )
             if not config.access_token:
