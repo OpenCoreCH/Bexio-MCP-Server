@@ -797,6 +797,230 @@ async def list_tools() -> List[Tool]:
                 },
                 "required": ["vat_period_id"]
             }
+        ),
+        # ==================== TIMESHEET TOOLS ====================
+        # Timesheets
+        Tool(
+            name="list_timesheets",
+            description="List all timesheet entries. AUTO-FILLED: limit=50, offset=0. Optional: order_by.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by"}
+                }
+            }
+        ),
+        Tool(
+            name="get_timesheet",
+            description="Get detailed information about a specific timesheet entry. REQUIRED: timesheet_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "timesheet_id": {"type": "integer", "description": "Timesheet ID"}
+                },
+                "required": ["timesheet_id"]
+            }
+        ),
+        Tool(
+            name="create_timesheet",
+            description="Create a new timesheet entry. REQUIRED: user_id, client_service_id, date, duration. Optional: allowable_bill, text, contact_id, pr_project_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "timesheet_data": {
+                        "type": "object",
+                        "description": "Timesheet data",
+                        "properties": {
+                            "user_id": {"type": "integer", "description": "REQUIRED: User ID performing the work"},
+                            "client_service_id": {"type": "integer", "description": "REQUIRED: Client service ID"},
+                            "date": {"type": "string", "description": "REQUIRED: Date of the timesheet entry (YYYY-MM-DD format)"},
+                            "duration": {"type": "string", "description": "REQUIRED: Duration in HH:MM format (e.g., '02:30' for 2.5 hours)"},
+                            "allowable_bill": {"type": "boolean", "description": "Whether the time is billable (default: false)"},
+                            "text": {"type": "string", "description": "Description text"},
+                            "contact_id": {"type": "integer", "description": "Contact ID"},
+                            "pr_project_id": {"type": "integer", "description": "Project ID"},
+                            "tracking_type": {"type": "integer", "description": "Type of tracking (0 or 1)"},
+                            "status_id": {"type": "integer", "description": "Timesheet status ID"}
+                        },
+                        "required": ["user_id", "client_service_id", "date", "duration"]
+                    }
+                },
+                "required": ["timesheet_data"]
+            }
+        ),
+        Tool(
+            name="search_timesheets",
+            description="Search for timesheet entries using specific criteria. REQUIRED: criteria array with field/value/criteria objects.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "criteria": {
+                        "type": "array",
+                        "description": "Search criteria array - each item must have field, value, and criteria",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {"type": "string", "description": "Field to search (e.g., 'user_id', 'date', 'client_service_id')"},
+                                "value": {"type": "string", "description": "Search value"},
+                                "criteria": {"type": "string", "description": "Search criteria: 'like', '=', '!=', etc.", "default": "="}
+                            },
+                            "required": ["field", "value", "criteria"]
+                        }
+                    }
+                },
+                "required": ["criteria"]
+            }
+        ),
+        # Timesheet Status
+        Tool(
+            name="list_timesheet_statuses",
+            description="List all available timesheet statuses.",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
+        Tool(
+            name="get_timesheet_status",
+            description="Get detailed information about a specific timesheet status. REQUIRED: status_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "status_id": {"type": "integer", "description": "Timesheet Status ID"}
+                },
+                "required": ["status_id"]
+            }
+        ),
+        # Client Services
+        Tool(
+            name="list_client_services",
+            description="List all client services. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_client_service",
+            description="Get detailed information about a specific client service. REQUIRED: client_service_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "client_service_id": {"type": "integer", "description": "Client Service ID"}
+                },
+                "required": ["client_service_id"]
+            }
+        ),
+        Tool(
+            name="create_client_service",
+            description="Create a new client service. REQUIRED: name, contact_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "client_service_data": {
+                        "type": "object",
+                        "description": "Client service data",
+                        "properties": {
+                            "name": {"type": "string", "description": "REQUIRED: Service name"},
+                            "contact_id": {"type": "integer", "description": "REQUIRED: Contact ID"}
+                        },
+                        "required": ["name", "contact_id"]
+                    }
+                },
+                "required": ["client_service_data"]
+            }
+        ),
+        Tool(
+            name="search_client_services",
+            description="Search for client services using specific criteria. REQUIRED: criteria array.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "criteria": {
+                        "type": "array",
+                        "description": "Search criteria array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {"type": "string", "description": "Field to search (e.g., 'name', 'contact_id')"},
+                                "value": {"type": "string", "description": "Search value"},
+                                "criteria": {"type": "string", "description": "Search criteria: 'like', '=', etc.", "default": "like"}
+                            },
+                            "required": ["field", "value", "criteria"]
+                        }
+                    }
+                },
+                "required": ["criteria"]
+            }
+        ),
+        # Business Activities
+        Tool(
+            name="list_business_activities",
+            description="List all business activities. AUTO-FILLED: limit=50, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
+            }
+        ),
+        Tool(
+            name="get_business_activity",
+            description="Get detailed information about a specific business activity. REQUIRED: business_activity_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "business_activity_id": {"type": "integer", "description": "Business Activity ID"}
+                },
+                "required": ["business_activity_id"]
+            }
+        ),
+        Tool(
+            name="create_business_activity",
+            description="Create a new business activity. REQUIRED: name.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "business_activity_data": {
+                        "type": "object",
+                        "description": "Business activity data",
+                        "properties": {
+                            "name": {"type": "string", "description": "REQUIRED: Activity name"}
+                        },
+                        "required": ["name"]
+                    }
+                },
+                "required": ["business_activity_data"]
+            }
+        ),
+        Tool(
+            name="search_business_activities",
+            description="Search for business activities using specific criteria. REQUIRED: criteria array.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "criteria": {
+                        "type": "array",
+                        "description": "Search criteria array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {"type": "string", "description": "Field to search (e.g., 'name')"},
+                                "value": {"type": "string", "description": "Search value"},
+                                "criteria": {"type": "string", "description": "Search criteria: 'like', '=', etc.", "default": "like"}
+                            },
+                            "required": ["field", "value", "criteria"]
+                        }
+                    }
+                },
+                "required": ["criteria"]
+            }
         )
     ]
 
@@ -1045,6 +1269,85 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         elif name == "get_vat_period":
             vat_period_id = arguments["vat_period_id"]
             result = await client.get_vat_period(vat_period_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # ==================== TIMESHEET TOOL HANDLERS ====================
+
+        # Timesheets
+        elif name == "list_timesheets":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.list_timesheets(limit=limit, offset=offset, order_by=order_by)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_timesheet":
+            timesheet_id = arguments["timesheet_id"]
+            result = await client.get_timesheet(timesheet_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "create_timesheet":
+            timesheet_data = arguments["timesheet_data"]
+            result = await client.create_timesheet(timesheet_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "search_timesheets":
+            criteria = arguments.get("criteria", [])
+            result = await client.search_timesheets(criteria)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Timesheet Status
+        elif name == "list_timesheet_statuses":
+            result = await client.list_timesheet_statuses()
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_timesheet_status":
+            status_id = arguments["status_id"]
+            result = await client.get_timesheet_status(status_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Client Services
+        elif name == "list_client_services":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_client_services(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_client_service":
+            client_service_id = arguments["client_service_id"]
+            result = await client.get_client_service(client_service_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "create_client_service":
+            client_service_data = arguments["client_service_data"]
+            result = await client.create_client_service(client_service_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "search_client_services":
+            criteria = arguments.get("criteria", [])
+            result = await client.search_client_services(criteria)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Business Activities
+        elif name == "list_business_activities":
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.list_business_activities(limit=limit, offset=offset)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "get_business_activity":
+            business_activity_id = arguments["business_activity_id"]
+            result = await client.get_business_activity(business_activity_id)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "create_business_activity":
+            business_activity_data = arguments["business_activity_data"]
+            result = await client.create_business_activity(business_activity_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "search_business_activities":
+            criteria = arguments.get("criteria", [])
+            result = await client.search_business_activities(criteria)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         else:

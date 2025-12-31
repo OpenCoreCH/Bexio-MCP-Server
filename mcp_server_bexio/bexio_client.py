@@ -647,3 +647,130 @@ class BexioClient:
     async def get_vat_period(self, vat_period_id: int) -> Dict[str, Any]:
         """Fetch a specific VAT period."""
         return await self.get(f"/vat_periods/{vat_period_id}")
+
+    # ==================== TIMESHEET METHODS ====================
+
+    # Timesheet methods
+    async def list_timesheets(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of timesheets."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+
+        return await self.get("/timesheet", params=params)
+
+    async def get_timesheet(self, timesheet_id: int) -> Dict[str, Any]:
+        """Fetch a specific timesheet."""
+        return await self.get(f"/timesheet/{timesheet_id}")
+
+    async def create_timesheet(self, timesheet_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new timesheet entry.
+
+        Required fields:
+        - user_id: User ID performing the work
+        - client_service_id: Client service ID
+        - date: Date of the timesheet entry (YYYY-MM-DD)
+        - duration: Duration in HH:MM format (e.g., "02:30")
+
+        Optional fields:
+        - allowable_bill: Whether the time is billable (boolean)
+        - text: Description text
+        - contact_id: Contact ID
+        - pr_project_id: Project ID
+        - tracking_type: Type of tracking (0 or 1)
+        """
+        return await self.post("/timesheet", timesheet_data)
+
+    async def search_timesheets(
+        self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200
+    ) -> List[Dict[str, Any]]:
+        """Search timesheets with criteria."""
+        try:
+            return await self.post("/timesheet/search", criteria)
+        except ValueError:
+            try:
+                return await self.post("/timesheet/search", {"criteria": criteria})
+            except ValueError:
+                batch = await self.list_timesheets(limit=fallback_limit)
+                return self._filter_by_criteria(batch, criteria)
+
+    # Timesheet Status methods
+    async def list_timesheet_statuses(self) -> List[Dict[str, Any]]:
+        """Fetch a list of timesheet statuses."""
+        return await self.get("/timesheet_status")
+
+    async def get_timesheet_status(self, status_id: int) -> Dict[str, Any]:
+        """Fetch a specific timesheet status."""
+        return await self.get(f"/timesheet_status/{status_id}")
+
+    # Client Service methods
+    async def list_client_services(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of client services."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/client_service", params=params)
+
+    async def get_client_service(self, client_service_id: int) -> Dict[str, Any]:
+        """Fetch a specific client service."""
+        return await self.get(f"/client_service/{client_service_id}")
+
+    async def create_client_service(self, client_service_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new client service.
+
+        Required fields:
+        - name: Service name
+        - contact_id: Contact ID
+        """
+        return await self.post("/client_service", client_service_data)
+
+    async def search_client_services(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Search client services with criteria."""
+        return await self.post("/client_service/search", criteria)
+
+    # Business Activity methods
+    async def list_business_activities(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetch a list of business activities."""
+        params = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+
+        return await self.get("/business_activity", params=params)
+
+    async def get_business_activity(self, business_activity_id: int) -> Dict[str, Any]:
+        """Fetch a specific business activity."""
+        return await self.get(f"/business_activity/{business_activity_id}")
+
+    async def create_business_activity(self, business_activity_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new business activity.
+
+        Required fields:
+        - name: Activity name
+        """
+        return await self.post("/business_activity", business_activity_data)
+
+    async def search_business_activities(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Search business activities with criteria."""
+        return await self.post("/business_activity/search", criteria)
