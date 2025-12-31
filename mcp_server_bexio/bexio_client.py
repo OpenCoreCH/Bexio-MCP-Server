@@ -163,16 +163,26 @@ class BexioClient:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         order_by: Optional[str] = None,
+        show_archived: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Fetch a list of contacts."""
-        params = {}
+        """Fetch a list of contacts.
+
+        Args:
+            limit: Maximum number of results to return
+            offset: Number of results to skip
+            order_by: Field to order results by
+            show_archived: If True, include archived contacts in results
+        """
+        params: Dict[str, Any] = {}
         if limit is not None:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
         if order_by is not None:
             params["order_by"] = order_by
-        
+        if show_archived:
+            params["show_archived"] = True
+
         return await self.get("/2.0/contact", params=params)
 
     async def get_contact(self, contact_id: int) -> Dict[str, Any]:
@@ -492,13 +502,22 @@ class BexioClient:
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        scope: Optional[str] = "active",
     ) -> List[Dict[str, Any]]:
-        """Fetch a list of taxes."""
-        params = {}
+        """Fetch a list of taxes.
+
+        Args:
+            limit: Maximum number of results to return
+            offset: Number of results to skip
+            scope: Filter by scope - 'active' (default) or None for all taxes including inactive
+        """
+        params: Dict[str, Any] = {}
         if limit is not None:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
+        if scope is not None:
+            params["scope"] = scope
 
         return await self.get("/3.0/taxes", params=params)
 
@@ -577,6 +596,40 @@ class BexioClient:
     async def get_next_reference_number(self) -> Dict[str, Any]:
         """Get the next available reference number for manual entries."""
         return await self.get("/3.0/accounting/manual_entries/reference_number")
+
+    # Journal Report methods (read-only accounting journal/ledger)
+    async def get_journal(
+        self,
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        account_uuid: Optional[str] = None,
+        limit: int = 500,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Fetch accounting journal entries (read-only ledger report).
+
+        This endpoint returns the accounting journal/ledger with filtering options.
+        Different from manual_entries which are for creating/managing journal entries.
+
+        Args:
+            from_date: Start date filter (YYYY-MM-DD format)
+            to_date: End date filter (YYYY-MM-DD format)
+            account_uuid: Filter by specific account UUID
+            limit: Maximum number of results (default 500)
+            offset: Number of results to skip (default 0)
+        """
+        params: Dict[str, Any] = {
+            "limit": limit,
+            "offset": offset,
+        }
+        if from_date is not None:
+            params["from"] = from_date
+        if to_date is not None:
+            params["to"] = to_date
+        if account_uuid is not None:
+            params["account_uuid"] = account_uuid
+
+        return await self.get("/3.0/accounting/journal", params=params)
 
     # Business Year methods
     async def list_business_years(
@@ -690,6 +743,25 @@ class BexioClient:
         """
         return await self.post("/2.0/timesheet", timesheet_data)
 
+    async def update_timesheet(
+        self, timesheet_id: int, timesheet_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Update an existing timesheet entry.
+
+        Args:
+            timesheet_id: ID of the timesheet to update
+            timesheet_data: Updated timesheet data
+        """
+        return await self.put(f"/2.0/timesheet/{timesheet_id}", timesheet_data)
+
+    async def delete_timesheet(self, timesheet_id: int) -> None:
+        """Delete a timesheet entry.
+
+        Args:
+            timesheet_id: ID of the timesheet to delete
+        """
+        await self.delete(f"/2.0/timesheet/{timesheet_id}")
+
     async def search_timesheets(
         self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200
     ) -> List[Dict[str, Any]]:
@@ -750,27 +822,27 @@ class BexioClient:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """Fetch a list of business activities."""
+        """Fetch a list of business activities (same as client services in Bexio API)."""
         params = {}
         if limit is not None:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
 
-        return await self.get("/2.0/business_activity", params=params)
+        return await self.get("/2.0/client_service", params=params)
 
     async def get_business_activity(self, business_activity_id: int) -> Dict[str, Any]:
-        """Fetch a specific business activity."""
-        return await self.get(f"/2.0/business_activity/{business_activity_id}")
+        """Fetch a specific business activity (same as client service in Bexio API)."""
+        return await self.get(f"/2.0/client_service/{business_activity_id}")
 
     async def create_business_activity(self, business_activity_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new business activity.
+        """Create a new business activity (same as client service in Bexio API).
 
         Required fields:
         - name: Activity name
         """
-        return await self.post("/2.0/business_activity", business_activity_data)
+        return await self.post("/2.0/client_service", business_activity_data)
 
     async def search_business_activities(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Search business activities with criteria."""
-        return await self.post("/2.0/business_activity/search", criteria)
+        """Search business activities with criteria (same as client services in Bexio API)."""
+        return await self.post("/2.0/client_service/search", criteria)

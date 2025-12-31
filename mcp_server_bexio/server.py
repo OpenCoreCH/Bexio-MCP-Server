@@ -235,13 +235,14 @@ async def list_tools() -> List[Tool]:
         ),
         Tool(
             name="list_contacts",
-            description="List all contacts with optional filtering. AUTO-FILLED: limit=50, offset=0. Optional: order_by.",
+            description="List all contacts with optional filtering. AUTO-FILLED: limit=50, offset=0, show_archived=false. Optional: order_by.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
                     "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
-                    "order_by": {"type": "string", "description": "Field to order by"}
+                    "order_by": {"type": "string", "description": "Field to order by"},
+                    "show_archived": {"type": "boolean", "description": "Include archived contacts in results", "default": False}
                 }
             }
         ),
@@ -580,12 +581,13 @@ async def list_tools() -> List[Tool]:
         # Taxes
         Tool(
             name="list_taxes",
-            description="List all taxes configured in Bexio. AUTO-FILLED: limit=50, offset=0.",
+            description="List all taxes configured in Bexio. AUTO-FILLED: limit=50, offset=0, scope='active'. Set scope=null to include inactive taxes.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "scope": {"type": ["string", "null"], "description": "Filter scope: 'active' (default) or null for all taxes", "default": "active"}
                 }
             }
         ),
@@ -708,6 +710,21 @@ async def list_tools() -> List[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {}
+            }
+        ),
+        # Journal Report (read-only accounting ledger)
+        Tool(
+            name="get_journal",
+            description="Get accounting journal/ledger entries (read-only report). Optional filters: from_date, to_date, account_uuid. AUTO-FILLED: limit=500, offset=0.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "from_date": {"type": "string", "description": "Start date filter (YYYY-MM-DD format)"},
+                    "to_date": {"type": "string", "description": "End date filter (YYYY-MM-DD format)"},
+                    "account_uuid": {"type": "string", "description": "Filter by specific account UUID"},
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 500},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                }
             }
         ),
         # Business Years
@@ -871,6 +888,43 @@ async def list_tools() -> List[Tool]:
                     }
                 },
                 "required": ["criteria"]
+            }
+        ),
+        Tool(
+            name="update_timesheet",
+            description="Update an existing timesheet entry. REQUIRED: timesheet_id, timesheet_data.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "timesheet_id": {"type": "integer", "description": "Timesheet ID to update"},
+                    "timesheet_data": {
+                        "type": "object",
+                        "description": "Updated timesheet data",
+                        "properties": {
+                            "user_id": {"type": "integer", "description": "User ID performing the work"},
+                            "client_service_id": {"type": "integer", "description": "Client service ID"},
+                            "date": {"type": "string", "description": "Date of the timesheet entry (YYYY-MM-DD format)"},
+                            "duration": {"type": "string", "description": "Duration in HH:MM format (e.g., '02:30')"},
+                            "allowable_bill": {"type": "boolean", "description": "Whether the time is billable"},
+                            "text": {"type": "string", "description": "Description text"},
+                            "contact_id": {"type": "integer", "description": "Contact ID"},
+                            "pr_project_id": {"type": "integer", "description": "Project ID"},
+                            "status_id": {"type": "integer", "description": "Timesheet status ID"}
+                        }
+                    }
+                },
+                "required": ["timesheet_id", "timesheet_data"]
+            }
+        ),
+        Tool(
+            name="delete_timesheet",
+            description="Delete a timesheet entry. REQUIRED: timesheet_id.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "timesheet_id": {"type": "integer", "description": "Timesheet ID to delete"}
+                },
+                "required": ["timesheet_id"]
             }
         ),
         # Timesheet Status
@@ -1066,8 +1120,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
             order_by = arguments.get("order_by")
-            
-            result = await client.list_contacts(limit=limit, offset=offset, order_by=order_by)
+            show_archived = arguments.get("show_archived", False)
+
+            result = await client.list_contacts(limit=limit, offset=offset, order_by=order_by, show_archived=show_archived)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
         elif name == "search_invoices":
@@ -1178,7 +1233,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         elif name == "list_taxes":
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
-            result = await client.list_taxes(limit=limit, offset=offset)
+            scope = arguments.get("scope", "active")
+            result = await client.list_taxes(limit=limit, offset=offset, scope=scope)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_tax":
@@ -1228,6 +1284,16 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         elif name == "get_next_reference_number":
             result = await client.get_next_reference_number()
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Journal Report
+        elif name == "get_journal":
+            from_date = arguments.get("from_date")
+            to_date = arguments.get("to_date")
+            account_uuid = arguments.get("account_uuid")
+            limit = arguments.get("limit", 500)
+            offset = arguments.get("offset", 0)
+            result = await client.get_journal(from_date=from_date, to_date=to_date, account_uuid=account_uuid, limit=limit, offset=offset)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         # Business Years
@@ -1295,6 +1361,17 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             criteria = arguments.get("criteria", [])
             result = await client.search_timesheets(criteria)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "update_timesheet":
+            timesheet_id = arguments["timesheet_id"]
+            timesheet_data = arguments["timesheet_data"]
+            result = await client.update_timesheet(timesheet_id, timesheet_data)
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        elif name == "delete_timesheet":
+            timesheet_id = arguments["timesheet_id"]
+            await client.delete_timesheet(timesheet_id)
+            return [TextContent(type="text", text=json.dumps({"success": True, "message": f"Timesheet {timesheet_id} deleted successfully"}, indent=2))]
 
         # Timesheet Status
         elif name == "list_timesheet_statuses":
