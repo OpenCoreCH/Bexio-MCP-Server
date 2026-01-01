@@ -680,25 +680,60 @@ async def list_tools() -> List[Tool]:
         ),
         Tool(
             name="create_manual_entry",
-            description="Create a new manual entry (accounting journal booking). REQUIRED: date, debit_account_id, credit_account_id, amount. Optional: tax_id, text, reference_nr.",
+            description="""Create a new manual entry (accounting journal booking).
+
+REQUIRED fields:
+- type: One of "manual_single_entry", "manual_compound_entry", or "manual_group_entry"
+- date: Booking date (YYYY-MM-DD)
+- entries: Array of entry objects
+
+ENTRY TYPES:
+1. manual_single_entry: Simple one-line booking (debit account -> credit account -> amount)
+2. manual_compound_entry: Split amount across multiple accounts (e.g., bank receipt to multiple revenue accounts)
+3. manual_group_entry: Multiple separate bookings with same reference number
+
+ENTRY FIELDS:
+- debit_account_id: Debit account ID (required for single/group entries)
+- credit_account_id: Credit account ID (required for single/group entries)
+- amount: Booking amount (required)
+- description: Entry description (optional, max 255 chars)
+- tax_id, tax_account_id, currency_id, currency_factor: Optional
+
+Use list_accounts to find valid account IDs from the chart of accounts.""",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "entry_data": {
                         "type": "object",
-                        "description": "Manual entry data",
+                        "description": "Manual entry data object",
                         "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["manual_single_entry", "manual_compound_entry", "manual_group_entry"],
+                                "description": "REQUIRED: Entry type - manual_single_entry (simple booking), manual_compound_entry (split across accounts), or manual_group_entry (multiple bookings same reference)"
+                            },
                             "date": {"type": "string", "description": "REQUIRED: Booking date (YYYY-MM-DD format)"},
-                            "debit_account_id": {"type": "integer", "description": "REQUIRED: Debit account ID (from chart of accounts)"},
-                            "credit_account_id": {"type": "integer", "description": "REQUIRED: Credit account ID (from chart of accounts)"},
-                            "amount": {"type": "number", "description": "REQUIRED: Booking amount"},
-                            "tax_id": {"type": "integer", "description": "Tax ID for VAT (optional)"},
-                            "text": {"type": "string", "description": "Description/reference text (optional)"},
-                            "reference_nr": {"type": "string", "description": "Reference number (optional, auto-generated if missing)"},
-                            "currency_id": {"type": "integer", "description": "Currency ID (optional, defaults to base currency)"},
-                            "currency_factor": {"type": "number", "description": "Exchange rate factor (optional)"}
+                            "reference_nr": {"type": "string", "description": "Reference number (optional, e.g., 'Booking BA-22')"},
+                            "entries": {
+                                "type": "array",
+                                "description": "REQUIRED: Array of entry line items",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "debit_account_id": {"type": "integer", "description": "Debit account ID (from chart of accounts)"},
+                                        "credit_account_id": {"type": "integer", "description": "Credit account ID (from chart of accounts)"},
+                                        "amount": {"type": "number", "description": "REQUIRED: Entry amount"},
+                                        "description": {"type": "string", "description": "Entry description (max 255 chars)"},
+                                        "tax_id": {"type": "integer", "description": "Tax ID for VAT"},
+                                        "tax_account_id": {"type": "integer", "description": "Account ID for tax (debit or credit account)"},
+                                        "currency_id": {"type": "integer", "description": "Currency ID (defaults to base currency)"},
+                                        "currency_factor": {"type": "number", "description": "Exchange rate factor (1 if same as base currency)"}
+                                    },
+                                    "required": ["amount"]
+                                }
+                            }
                         },
-                        "required": ["date", "debit_account_id", "credit_account_id", "amount"]
+                        "required": ["type", "date", "entries"]
                     }
                 },
                 "required": ["entry_data"]

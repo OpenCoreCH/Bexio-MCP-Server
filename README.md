@@ -13,6 +13,7 @@ MCP server for Bexio ERP integration - enables AI assistants to interact with Be
 - 💰 **Quote Management**: Handle quotes and proposals
 - 🏗️ **Project Management**: Create and track projects
 - 📦 **Item/Article Management**: Manage products and services
+- 📒 **Accounting & Journal**: Create manual entries, view journal, manage chart of accounts
 - 🔐 **Secure Authentication**: Uses Bexio Personal Access Tokens (PAT)
 - ✅ **Smart Field Validation**: Automatic field completion and 422 error prevention
 - 🛡️ **Enhanced Error Handling**: Clear guidance for missing or invalid fields
@@ -243,6 +244,118 @@ Auto-filled fields (can be overridden):
 - `is_stock`: Stock item flag (default: false)
 - `delivery_price`: Delivery price (default: 0)
 
+### Manual Entry Management (Accounting Journal)
+
+Manual entries allow you to create accounting journal bookings directly in Bexio.
+
+#### list_manual_entries
+List all manual entries with pagination.
+Parameters:
+- `limit`: Maximum number of results (auto-filled: 50)
+- `offset`: Number of records to skip (auto-filled: 0)
+- `order_by`: Field to order by (optional)
+
+#### get_manual_entry
+Get detailed information about a specific manual entry.
+Parameters:
+- `entry_id` (required): Manual entry ID
+
+#### create_manual_entry
+Create a new manual entry (accounting journal booking).
+
+**Required fields:**
+- `type`: Entry type (see below)
+- `date`: Booking date (YYYY-MM-DD format)
+- `entries`: Array of entry line items
+
+**Entry Types:**
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| `manual_single_entry` | Simple one-line booking | Single debit/credit transaction |
+| `manual_compound_entry` | Amount split across multiple accounts | Bank receipt to multiple revenue accounts |
+| `manual_group_entry` | Multiple bookings with same reference | Batch of related transactions |
+
+**Entry Fields (per item in entries array):**
+- `debit_account_id`: Debit account ID (required for single/group)
+- `credit_account_id`: Credit account ID (required for single/group)
+- `amount`: Booking amount (required)
+- `description`: Entry description (max 255 chars, optional)
+- `tax_id`: Tax ID for VAT (optional)
+- `tax_account_id`: Account ID for tax booking (optional)
+- `currency_id`: Currency ID (optional, defaults to base currency)
+- `currency_factor`: Exchange rate factor (optional)
+
+**Example - Simple booking (manual_single_entry):**
+```json
+{
+  "type": "manual_single_entry",
+  "date": "2024-01-15",
+  "reference_nr": "Payment-001",
+  "entries": [{
+    "debit_account_id": 1020,
+    "credit_account_id": 3200,
+    "amount": 1000.00,
+    "description": "Customer payment received"
+  }]
+}
+```
+
+**Example - Compound entry (split across accounts):**
+```json
+{
+  "type": "manual_compound_entry",
+  "date": "2024-01-15",
+  "entries": [
+    {"debit_account_id": 1020, "amount": 25000},
+    {"credit_account_id": 3200, "amount": 10000},
+    {"credit_account_id": 3201, "amount": 8000},
+    {"credit_account_id": 3202, "amount": 7000}
+  ]
+}
+```
+
+**Example - Group entry (multiple bookings):**
+```json
+{
+  "type": "manual_group_entry",
+  "date": "2024-01-15",
+  "reference_nr": "Multi-001",
+  "entries": [
+    {"debit_account_id": 1020, "credit_account_id": 3200, "amount": 13600},
+    {"debit_account_id": 1021, "credit_account_id": 3201, "amount": 7230}
+  ]
+}
+```
+
+#### get_next_reference_number
+Get the next available reference number for manual entries.
+No parameters required.
+
+#### get_journal
+Get accounting journal/ledger entries (read-only report).
+Parameters:
+- `from_date`: Start date filter (YYYY-MM-DD, optional)
+- `to_date`: End date filter (YYYY-MM-DD, optional)
+- `account_uuid`: Filter by specific account UUID (optional)
+- `limit`: Maximum number of results (auto-filled: 500)
+- `offset`: Number of records to skip (auto-filled: 0)
+
+### Account Management (Chart of Accounts)
+
+#### list_accounts
+List all accounts from the chart of accounts.
+Parameters:
+- `limit`: Maximum number of results (auto-filled: 100)
+- `offset`: Number of records to skip (auto-filled: 0)
+
+Use this to find valid `debit_account_id` and `credit_account_id` values for manual entries.
+
+#### get_account
+Get detailed information about a specific account.
+Parameters:
+- `account_id` (required): Account ID
+
 ## Common Use Cases
 
 ### Customer Management
@@ -268,6 +381,18 @@ Auto-filled fields (can be overridden):
 - Track stock levels
 - Update pricing information
 - Handle product variations
+
+### Accounting Operations
+- Create manual journal entries (single, compound, or group)
+- View accounting journal/ledger reports
+- Look up accounts from chart of accounts
+- Track reference numbers for bookings
+
+Example prompts:
+- "Create a journal entry for a customer payment of CHF 1500 to bank account 1020 from revenue account 3200"
+- "Show me all journal entries from last month"
+- "List all accounts in the chart of accounts"
+- "What is the next available reference number for manual entries?"
 
 ## Security Considerations
 

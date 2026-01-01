@@ -580,16 +580,58 @@ class BexioClient:
     async def create_manual_entry(self, entry_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new manual entry (accounting journal booking).
 
-        Required fields:
-        - date: Booking date (YYYY-MM-DD format)
-        - debit_account_id: Debit account ID
-        - credit_account_id: Credit account ID
-        - amount: Booking amount
+        The payload structure requires:
+        - type: Entry type (required), one of:
+          - "manual_single_entry": Simple one-line booking (debit/credit/amount)
+          - "manual_compound_entry": Complex booking with amount split across multiple accounts
+          - "manual_group_entry": Multiple one-line bookings with same reference_nr
+        - date: Booking date (YYYY-MM-DD format, required)
+        - reference_nr: Reference number (optional, e.g., "Booking BA-22")
+        - entries: Array of entry objects (required), each containing:
+          - debit_account_id: Debit account ID (required for single/group, optional for compound)
+          - credit_account_id: Credit account ID (required for single/group, optional for compound)
+          - amount: Booking amount (required)
+          - description: Entry description (optional, max 255 chars)
+          - tax_id: Tax ID for VAT (optional)
+          - tax_account_id: Account ID for tax (debit or credit account, optional)
+          - currency_id: Currency ID (optional, defaults to base currency)
+          - currency_factor: Exchange rate factor (optional, 1 if same as base currency)
 
-        Optional fields:
-        - tax_id: Tax ID for VAT
-        - text: Description/reference text
-        - reference_nr: Reference number
+        Example - manual_single_entry (simple booking):
+        {
+            "type": "manual_single_entry",
+            "date": "2024-01-15",
+            "reference_nr": "Payment-001",
+            "entries": [{
+                "debit_account_id": 1020,
+                "credit_account_id": 3200,
+                "amount": 1000.00,
+                "description": "Customer payment received"
+            }]
+        }
+
+        Example - manual_compound_entry (split across accounts):
+        {
+            "type": "manual_compound_entry",
+            "date": "2024-01-15",
+            "entries": [
+                {"debit_account_id": 1020, "amount": 25000},
+                {"credit_account_id": 3200, "amount": 10000},
+                {"credit_account_id": 3201, "amount": 8000},
+                {"credit_account_id": 3202, "amount": 7000}
+            ]
+        }
+
+        Example - manual_group_entry (multiple bookings, same reference):
+        {
+            "type": "manual_group_entry",
+            "date": "2024-01-15",
+            "reference_nr": "Multi-001",
+            "entries": [
+                {"debit_account_id": 1020, "credit_account_id": 3200, "amount": 13600},
+                {"debit_account_id": 1021, "credit_account_id": 3201, "amount": 7230}
+            ]
+        }
         """
         return await self.post("/3.0/accounting/manual_entries", entry_data)
 
