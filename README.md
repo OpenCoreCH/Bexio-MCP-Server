@@ -283,7 +283,7 @@ Create a new manual entry (accounting journal booking).
 - `description`: Entry description (max 255 chars, optional)
 - `tax_id`: Tax ID for VAT (optional)
 - `tax_account_id`: Account ID for tax booking (optional)
-- `currency_id`: Currency ID (optional, defaults to base currency)
+- `currency_id`: Currency ID (auto-filled: 1 for CHF if not specified)
 - `currency_factor`: Exchange rate factor (optional)
 
 **Example - Simple booking (manual_single_entry):**

@@ -726,7 +726,7 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                                         "description": {"type": "string", "description": "Entry description (max 255 chars)"},
                                         "tax_id": {"type": "integer", "description": "Tax ID for VAT"},
                                         "tax_account_id": {"type": "integer", "description": "Account ID for tax (debit or credit account)"},
-                                        "currency_id": {"type": "integer", "description": "Currency ID (defaults to base currency)"},
+                                        "currency_id": {"type": "integer", "description": "Currency ID (AUTO-FILLED: 1 for CHF if not specified)"},
                                         "currency_factor": {"type": "number", "description": "Exchange rate factor (1 if same as base currency)"}
                                     },
                                     "required": ["amount"]
@@ -1314,6 +1314,11 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         elif name == "create_manual_entry":
             entry_data = arguments["entry_data"]
+            # Auto-fill currency_id to 1 (CHF) for each entry if not specified
+            if "entries" in entry_data:
+                for entry in entry_data["entries"]:
+                    if "currency_id" not in entry:
+                        entry["currency_id"] = 1
             result = await client.create_manual_entry(entry_data)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
