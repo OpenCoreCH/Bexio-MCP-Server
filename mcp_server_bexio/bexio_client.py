@@ -1,5 +1,8 @@
 """Bexio REST API client for API communication."""
 
+import re
+import time
+
 import httpx
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
@@ -307,7 +310,42 @@ class BexioClient:
 
     async def create_quote(self, quote_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new quote."""
-        return await self.post("/2.0/kb_offer", quote_data)
+        try:
+            return await self.post("/2.0/kb_offer", quote_data)
+        except ValueError as e:
+            error_msg = str(e)
+            # If document_nr is required (automatic numbering disabled), generate one
+            if "422" in error_msg and "document_nr" in error_msg and "document_nr" not in quote_data:
+                next_nr = await self._get_next_quote_document_nr()
+                quote_data["document_nr"] = next_nr
+                return await self.post("/2.0/kb_offer", quote_data)
+            raise
+
+    async def _get_next_quote_document_nr(self) -> str:
+        """Generate the next quote document number based on existing quotes."""
+        try:
+            # Fetch recent quotes to find the highest document_nr
+            quotes = await self.list_quotes(limit=100, order_by="id_desc")
+            max_num = 0
+            prefix = "AN-"  # Default prefix for Angebot (quote in German)
+
+            for quote in quotes:
+                doc_nr = quote.get("document_nr", "")
+                if doc_nr:
+                    # Extract prefix and number (e.g., "AN-00001" -> prefix="AN-", num=1)
+                    match = re.match(r'^([A-Za-z]+-?)(\d+)$', doc_nr)
+                    if match:
+                        prefix = match.group(1)
+                        num = int(match.group(2))
+                        if num > max_num:
+                            max_num = num
+
+            # Generate next number with same prefix and padding
+            next_num = max_num + 1
+            return f"{prefix}{next_num:05d}"
+        except Exception:
+            # Fallback: use timestamp-based unique number
+            return f"AN-{int(time.time())}"
 
     async def update_quote(
         self, quote_id: int, quote_data: Dict[str, Any]
