@@ -159,7 +159,9 @@ async def list_tools() -> List[Tool]:
                         }
                     },
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Order by one of: id, nr, name_1, updated_at"},
+                    "show_archived": {"type": "boolean", "description": "Include archived contacts in search"}
                 },
                 "required": ["criteria"]
             }
@@ -266,7 +268,8 @@ async def list_tools() -> List[Tool]:
                         }
                     },
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Order by one of: id, total, total_net, total_gross, updated_at"}
                 }
             }
         ),
@@ -289,7 +292,8 @@ async def list_tools() -> List[Tool]:
                 "properties": {
                     "contact_id": {"type": "integer", "description": "REQUIRED: Contact ID for the invoice"},
                     "user_id": {"type": "integer", "description": "REQUIRED: User ID. Auto-filled with 1 if missing."},
-                    "nr": {"type": "string", "description": "Invoice number. API auto-generates if missing."},
+                    "document_nr": {"type": "string", "description": "Invoice number. API auto-generates if missing when automatic numbering is enabled."},
+                    "nr": {"type": "string", "description": "Legacy alias for document_nr (auto-mapped)."},
                     "title": {"type": "string", "description": "Invoice title"},
                     "positions": {
                         "type": "array",
@@ -342,7 +346,8 @@ async def list_tools() -> List[Tool]:
                         }
                     },
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Order by one of: id, total, total_net, total_gross, updated_at"}
                 }
             }
         ),
@@ -365,7 +370,8 @@ async def list_tools() -> List[Tool]:
                 "properties": {
                     "contact_id": {"type": "integer", "description": "REQUIRED: Contact ID for the quote"},
                     "user_id": {"type": "integer", "description": "REQUIRED: User ID. Auto-filled with 1 if missing."},
-                    "nr": {"type": "string", "description": "Quote number. API auto-generates if missing."},
+                    "document_nr": {"type": "string", "description": "Quote number. API auto-generates if missing when automatic numbering is enabled."},
+                    "nr": {"type": "string", "description": "Legacy alias for document_nr (auto-mapped)."},
                     "title": {"type": "string", "description": "Quote title"},
                     "positions": {
                         "type": "array",
@@ -422,7 +428,8 @@ async def list_tools() -> List[Tool]:
                             "name": {"type": "string", "description": "REQUIRED: Project name"},
                             "contact_id": {"type": "integer", "description": "REQUIRED: Contact ID for the project"},
                             "user_id": {"type": "integer", "description": "REQUIRED: User ID. Auto-filled with 1 if missing."},
-                            "nr": {"type": "string", "description": "Project number. API auto-generates if missing."},
+                            "document_nr": {"type": "string", "description": "Project number. API auto-generates if missing when automatic numbering is enabled."},
+                            "nr": {"type": "string", "description": "Legacy alias for document_nr (auto-mapped)."},
                             "pr_project_type_id": {"type": "integer", "description": "REQUIRED: Project type ID. Auto-filled with 1 if missing."},
                             "pr_state_id": {"type": "integer", "description": "REQUIRED: Project state ID. Auto-filled with 1 if missing."}
                         },
@@ -467,7 +474,7 @@ async def list_tools() -> List[Tool]:
                         "properties": {
                             "intern_name": {"type": "string", "description": "REQUIRED: Internal item name"},
                             "user_id": {"type": "integer", "description": "REQUIRED: User ID. Auto-filled with 1 if missing."},
-                            "nr": {"type": "string", "description": "Item number. API auto-generates if missing."},
+                            "nr": {"type": "string", "description": "Legacy alias for intern_code (auto-mapped)."},
                             "article_type_id": {"type": "integer", "description": "REQUIRED: Article type ID. Auto-filled with 1 if missing."},
                             "contact_id": {"type": "integer", "description": "Supplier contact ID"},
                             "deliverer_code": {"type": "string", "description": "Supplier article number"},
@@ -523,7 +530,7 @@ async def list_tools() -> List[Tool]:
         ),
         Tool(
             name="get_account",
-            description="Get detailed information about a specific account. REQUIRED: account_id.",
+            description="Get detailed information about a specific account. REQUIRED: account_id. Note: API has no direct account-by-id endpoint; resolved via list+filter.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -550,7 +557,9 @@ async def list_tools() -> List[Tool]:
                             },
                             "required": ["field", "value", "criteria"]
                         }
-                    }
+                    },
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
                 },
                 "required": ["criteria"]
             }
@@ -569,7 +578,7 @@ async def list_tools() -> List[Tool]:
         ),
         Tool(
             name="get_account_group",
-            description="Get detailed information about a specific account group. REQUIRED: account_group_id.",
+            description="Get detailed information about a specific account group. REQUIRED: account_group_id. Note: API has no direct account-group-by-id endpoint; resolved via list+filter.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -587,7 +596,9 @@ async def list_tools() -> List[Tool]:
                 "properties": {
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
                     "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
-                    "scope": {"type": ["string", "null"], "description": "Filter scope: 'active' (default) or null for all taxes", "default": "active"}
+                    "scope": {"type": ["string", "null"], "description": "Filter scope: 'active' (default) or null for all taxes", "default": "active"},
+                    "date": {"type": "string", "description": "Optional validity date filter (YYYY-MM-DD)."},
+                    "types": {"type": "string", "description": "Optional type filter: sales_tax or pre_tax."}
                 }
             }
         ),
@@ -605,12 +616,13 @@ async def list_tools() -> List[Tool]:
         # Currencies
         Tool(
             name="list_currencies",
-            description="List all currencies configured in Bexio. AUTO-FILLED: limit=50, offset=0.",
+            description="List all currencies configured in Bexio. AUTO-FILLED: limit=50, offset=0. Optional: date for valid rate snapshot.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "date": {"type": "string", "description": "Optional date (YYYY-MM-DD) to resolve exchange-rate fields."}
                 }
             }
         ),
@@ -646,12 +658,14 @@ async def list_tools() -> List[Tool]:
         ),
         Tool(
             name="get_exchange_rates",
-            description="Get exchange rates for currencies. Optional: date parameter for historical rates.",
+            description="Get exchange rates for a specific currency. REQUIRED: currency_id. Optional: date parameter for historical rates.",
             inputSchema={
                 "type": "object",
                 "properties": {
+                    "currency_id": {"type": "integer", "description": "REQUIRED: Currency ID"},
                     "date": {"type": "string", "description": "Date for exchange rates (YYYY-MM-DD format). Defaults to current date."}
-                }
+                },
+                "required": ["currency_id"]
             }
         ),
         # Manual Entries / Accounting Journal
@@ -669,7 +683,7 @@ async def list_tools() -> List[Tool]:
         ),
         Tool(
             name="get_manual_entry",
-            description="Get detailed information about a specific manual entry. REQUIRED: entry_id.",
+            description="Get detailed information about a specific manual entry. REQUIRED: entry_id. Note: API has no direct manual-entry-by-id endpoint; resolved via list+filter.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -877,7 +891,7 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
         ),
         Tool(
             name="create_timesheet",
-            description="Create a new timesheet entry. REQUIRED: user_id, client_service_id, date, duration. Optional: allowable_bill, text, contact_id, pr_project_id.",
+            description="Create a new timesheet entry. REQUIRED: user_id, client_service_id, allowable_bill, tracking. Legacy date/duration input is accepted and auto-converted.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -887,16 +901,19 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                         "properties": {
                             "user_id": {"type": "integer", "description": "REQUIRED: User ID performing the work"},
                             "client_service_id": {"type": "integer", "description": "REQUIRED: Client service ID"},
-                            "date": {"type": "string", "description": "REQUIRED: Date of the timesheet entry (YYYY-MM-DD format)"},
-                            "duration": {"type": "string", "description": "REQUIRED: Duration in HH:MM format (e.g., '02:30' for 2.5 hours)"},
-                            "allowable_bill": {"type": "boolean", "description": "Whether the time is billable (default: false)"},
+                            "allowable_bill": {"type": "boolean", "description": "REQUIRED: Whether the time is billable"},
+                            "tracking": {
+                                "type": "object",
+                                "description": "REQUIRED: Tracking object. Either duration ({type:'duration',date,duration}) or range ({type:'range',date,start_time,end_time})."
+                            },
+                            "date": {"type": "string", "description": "Legacy alias for tracking.date (YYYY-MM-DD)."},
+                            "duration": {"type": "string", "description": "Legacy alias for tracking.duration (HH:MM)."},
                             "text": {"type": "string", "description": "Description text"},
                             "contact_id": {"type": "integer", "description": "Contact ID"},
                             "pr_project_id": {"type": "integer", "description": "Project ID"},
-                            "tracking_type": {"type": "integer", "description": "Type of tracking (0 or 1)"},
                             "status_id": {"type": "integer", "description": "Timesheet status ID"}
                         },
-                        "required": ["user_id", "client_service_id", "date", "duration"]
+                        "required": ["user_id", "client_service_id"]
                     }
                 },
                 "required": ["timesheet_data"]
@@ -920,7 +937,10 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                             },
                             "required": ["field", "value", "criteria"]
                         }
-                    }
+                    },
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Order by one of: id, date"}
                 },
                 "required": ["criteria"]
             }
@@ -938,9 +958,13 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                         "properties": {
                             "user_id": {"type": "integer", "description": "User ID performing the work"},
                             "client_service_id": {"type": "integer", "description": "Client service ID"},
-                            "date": {"type": "string", "description": "Date of the timesheet entry (YYYY-MM-DD format)"},
-                            "duration": {"type": "string", "description": "Duration in HH:MM format (e.g., '02:30')"},
                             "allowable_bill": {"type": "boolean", "description": "Whether the time is billable"},
+                            "tracking": {
+                                "type": "object",
+                                "description": "Tracking object. Either duration ({type:'duration',date,duration}) or range ({type:'range',date,start_time,end_time})."
+                            },
+                            "date": {"type": "string", "description": "Legacy alias for tracking.date (YYYY-MM-DD)."},
+                            "duration": {"type": "string", "description": "Legacy alias for tracking.duration (HH:MM)."},
                             "text": {"type": "string", "description": "Description text"},
                             "contact_id": {"type": "integer", "description": "Contact ID"},
                             "pr_project_id": {"type": "integer", "description": "Project ID"},
@@ -965,15 +989,19 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
         # Timesheet Status
         Tool(
             name="list_timesheet_statuses",
-            description="List all available timesheet statuses.",
+            description="List all available timesheet statuses. Optional: limit, offset, order_by.",
             inputSchema={
                 "type": "object",
-                "properties": {}
+                "properties": {
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by (id or name)."}
+                }
             }
         ),
         Tool(
             name="get_timesheet_status",
-            description="Get detailed information about a specific timesheet status. REQUIRED: status_id.",
+            description="Get detailed information about a specific timesheet status. REQUIRED: status_id. Note: API has no direct timesheet-status-by-id endpoint; resolved via list+filter.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -985,18 +1013,19 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
         # Client Services
         Tool(
             name="list_client_services",
-            description="List all client services. AUTO-FILLED: limit=50, offset=0.",
+            description="List all client services. AUTO-FILLED: limit=50, offset=0. Optional: order_by.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by (id or name)."}
                 }
             }
         ),
         Tool(
             name="get_client_service",
-            description="Get detailed information about a specific client service. REQUIRED: client_service_id.",
+            description="Get detailed information about a specific client service. REQUIRED: client_service_id. Note: API has no direct client-service-by-id endpoint; resolved via list+filter.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1007,7 +1036,7 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
         ),
         Tool(
             name="create_client_service",
-            description="Create a new client service. REQUIRED: name, contact_id.",
+            description="Create a new client service/business activity. REQUIRED: name. Optional: default_is_billable, default_price_per_hour, account_id.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1016,9 +1045,11 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                         "description": "Client service data",
                         "properties": {
                             "name": {"type": "string", "description": "REQUIRED: Service name"},
-                            "contact_id": {"type": "integer", "description": "REQUIRED: Contact ID"}
+                            "default_is_billable": {"type": "boolean", "description": "Whether this activity is billable by default."},
+                            "default_price_per_hour": {"type": "number", "description": "Default hourly rate for this activity."},
+                            "account_id": {"type": "integer", "description": "Optional account reference."}
                         },
-                        "required": ["name", "contact_id"]
+                        "required": ["name"]
                     }
                 },
                 "required": ["client_service_data"]
@@ -1036,13 +1067,16 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                         "items": {
                             "type": "object",
                             "properties": {
-                                "field": {"type": "string", "description": "Field to search (e.g., 'name', 'contact_id')"},
+                                "field": {"type": "string", "description": "Field to search (e.g., 'name')"},
                                 "value": {"type": "string", "description": "Search value"},
                                 "criteria": {"type": "string", "description": "Search criteria: 'like', '=', etc.", "default": "like"}
                             },
                             "required": ["field", "value", "criteria"]
                         }
-                    }
+                    },
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by (id or name)."}
                 },
                 "required": ["criteria"]
             }
@@ -1050,18 +1084,19 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
         # Business Activities
         Tool(
             name="list_business_activities",
-            description="List all business activities. AUTO-FILLED: limit=50, offset=0.",
+            description="List all business activities. AUTO-FILLED: limit=50, offset=0. Optional: order_by.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
-                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0}
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by (id or name)."}
                 }
             }
         ),
         Tool(
             name="get_business_activity",
-            description="Get detailed information about a specific business activity. REQUIRED: business_activity_id.",
+            description="Get detailed information about a specific business activity. REQUIRED: business_activity_id. Note: API has no direct business-activity-by-id endpoint; resolved via list+filter.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1072,7 +1107,7 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
         ),
         Tool(
             name="create_business_activity",
-            description="Create a new business activity. REQUIRED: name.",
+            description="Create a new business activity. REQUIRED: name. Optional: default_is_billable, default_price_per_hour, account_id.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -1080,7 +1115,10 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                         "type": "object",
                         "description": "Business activity data",
                         "properties": {
-                            "name": {"type": "string", "description": "REQUIRED: Activity name"}
+                            "name": {"type": "string", "description": "REQUIRED: Activity name"},
+                            "default_is_billable": {"type": "boolean", "description": "Whether this activity is billable by default."},
+                            "default_price_per_hour": {"type": "number", "description": "Default hourly rate for this activity."},
+                            "account_id": {"type": "integer", "description": "Optional account reference."}
                         },
                         "required": ["name"]
                     }
@@ -1106,7 +1144,10 @@ Use list_accounts to find valid account IDs from the chart of accounts.""",
                             },
                             "required": ["field", "value", "criteria"]
                         }
-                    }
+                    },
+                    "limit": {"type": "integer", "description": "Maximum number of results", "default": 50},
+                    "offset": {"type": "integer", "description": "Number of records to skip", "default": 0},
+                    "order_by": {"type": "string", "description": "Field to order by (id or name)."}
                 },
                 "required": ["criteria"]
             }
@@ -1129,10 +1170,18 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             criteria = arguments.get("criteria", [])
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            show_archived = arguments.get("show_archived", False)
             
             # Format search payload according to Bexio API requirements
             search_payload = criteria
-            result = await client.search_contacts(search_payload)
+            result = await client.search_contacts(
+                search_payload,
+                limit=limit,
+                offset=offset,
+                order_by=order_by,
+                show_archived=show_archived,
+            )
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
         elif name == "get_contact":
@@ -1162,7 +1211,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         
         elif name == "search_invoices":
             criteria = arguments.get("criteria", [])
-            result = await client.search_invoices(criteria)
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.search_invoices(criteria, limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
         elif name == "get_invoice":
@@ -1184,7 +1236,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         
         elif name == "search_quotes":
             criteria = arguments.get("criteria", [])
-            result = await client.search_quotes(criteria)
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.search_quotes(criteria, limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
         
         elif name == "get_quote":
@@ -1249,7 +1304,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         elif name == "search_accounts":
             criteria = arguments.get("criteria", [])
-            result = await client.search_accounts(criteria)
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            result = await client.search_accounts(criteria, limit=limit, offset=offset)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         # Account Groups
@@ -1269,7 +1326,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
             scope = arguments.get("scope", "active")
-            result = await client.list_taxes(limit=limit, offset=offset, scope=scope)
+            date = arguments.get("date")
+            types = arguments.get("types")
+            result = await client.list_taxes(limit=limit, offset=offset, scope=scope, date=date, types=types)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_tax":
@@ -1281,7 +1340,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         elif name == "list_currencies":
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
-            result = await client.list_currencies(limit=limit, offset=offset)
+            date = arguments.get("date")
+            result = await client.list_currencies(limit=limit, offset=offset, date=date)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_currency":
@@ -1295,8 +1355,9 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_exchange_rates":
+            currency_id = arguments["currency_id"]
             date = arguments.get("date")
-            result = await client.get_exchange_rates(date=date)
+            result = await client.get_exchange_rates(currency_id=currency_id, date=date)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         # Manual Entries / Accounting Journal
@@ -1399,7 +1460,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         elif name == "search_timesheets":
             criteria = arguments.get("criteria", [])
-            result = await client.search_timesheets(criteria)
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.search_timesheets(criteria, limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "update_timesheet":
@@ -1415,7 +1479,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         # Timesheet Status
         elif name == "list_timesheet_statuses":
-            result = await client.list_timesheet_statuses()
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.list_timesheet_statuses(limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_timesheet_status":
@@ -1427,7 +1494,8 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         elif name == "list_client_services":
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
-            result = await client.list_client_services(limit=limit, offset=offset)
+            order_by = arguments.get("order_by")
+            result = await client.list_client_services(limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_client_service":
@@ -1442,14 +1510,18 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         elif name == "search_client_services":
             criteria = arguments.get("criteria", [])
-            result = await client.search_client_services(criteria)
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.search_client_services(criteria, limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         # Business Activities
         elif name == "list_business_activities":
             limit = arguments.get("limit", 50)
             offset = arguments.get("offset", 0)
-            result = await client.list_business_activities(limit=limit, offset=offset)
+            order_by = arguments.get("order_by")
+            result = await client.list_business_activities(limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         elif name == "get_business_activity":
@@ -1464,7 +1536,10 @@ async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
 
         elif name == "search_business_activities":
             criteria = arguments.get("criteria", [])
-            result = await client.search_business_activities(criteria)
+            limit = arguments.get("limit", 50)
+            offset = arguments.get("offset", 0)
+            order_by = arguments.get("order_by")
+            result = await client.search_business_activities(criteria, limit=limit, offset=offset, order_by=order_by)
             return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
         else:
