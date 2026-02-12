@@ -5,9 +5,8 @@ import time
 
 import httpx
 from typing import Any, Dict, List, Optional, Union
-from urllib.parse import urljoin
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 
 class BexioConfig(BaseModel):
@@ -52,7 +51,7 @@ class BexioClient:
         method: str,
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
-        json_data: Optional[Dict[str, Any]] = None,
+        json_data: Optional[Union[Dict[str, Any], List[Any]]] = None,
     ) -> Any:
         """Make a request to the Bexio API."""
         # Build URL without dropping the version path (avoid urljoin resetting path)
@@ -68,7 +67,12 @@ class BexioClient:
                 json=json_data,
             )
             response.raise_for_status()
-            return response.json()
+            if response.status_code == 204 or not response.content:
+                return {"success": True}
+            try:
+                return response.json()
+            except Exception:
+                return response.text
         except httpx.HTTPStatusError as e:
             error_detail = f"HTTP {e.response.status_code}"
             try:
@@ -126,6 +130,78 @@ class BexioClient:
 
         return [it for it in items if matches(it)]
 
+    def _normalize_sales_document_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize quote/order/invoice payload aliases to API field names."""
+        normalized = dict(payload)
+        if "nr" in normalized and "document_nr" not in normalized:
+            normalized["document_nr"] = normalized.pop("nr")
+        if "project_id" in normalized and "pr_project_id" not in normalized:
+            normalized["pr_project_id"] = normalized.pop("project_id")
+        return normalized
+
+    def _normalize_project_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize project payload aliases to API field names."""
+        normalized = dict(payload)
+        if "nr" in normalized and "document_nr" not in normalized:
+            normalized["document_nr"] = normalized.pop("nr")
+        return normalized
+
+    def _normalize_item_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize legacy item aliases to API field names."""
+        normalized = dict(payload)
+        if "nr" in normalized and "intern_code" not in normalized:
+            normalized["intern_code"] = normalized.pop("nr")
+        alias_map = {
+            "stock_min": "stock_min_nr",
+            "stock_reserved": "stock_reserved_nr",
+            "stock_available": "stock_available_nr",
+            "stock_picked": "stock_picked_nr",
+            "stock_disposed": "stock_disposed_nr",
+            "stock_ordered": "stock_ordered_nr",
+        }
+        for legacy_key, api_key in alias_map.items():
+            if legacy_key in normalized and api_key not in normalized:
+                normalized[api_key] = normalized.pop(legacy_key)
+        return normalized
+
+    def _normalize_timesheet_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize timesheet payload to documented tracking shape."""
+        normalized = dict(payload)
+        tracking = normalized.get("tracking")
+        tracking_type = normalized.pop("tracking_type", None)
+        if tracking is None:
+            date = normalized.pop("date", None)
+            duration = normalized.pop("duration", None)
+            start_time = normalized.pop("start_time", None)
+            end_time = normalized.pop("end_time", None)
+            if date and duration:
+                normalized["tracking"] = {"type": "duration", "date": date, "duration": duration}
+            elif date and start_time and end_time:
+                normalized["tracking"] = {
+                    "type": "range",
+                    "date": date,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                }
+            elif tracking_type in ("duration", "range"):
+                # Keep user intent even when details are incomplete; API will validate remaining fields.
+                normalized["tracking"] = {"type": tracking_type}
+        if "allowable_bill" not in normalized:
+            normalized["allowable_bill"] = False
+        return normalized
+
+    def _find_item_by_id(
+        self,
+        items: List[Dict[str, Any]],
+        item_id: int,
+        resource_name: str,
+    ) -> Dict[str, Any]:
+        """Find an object by id inside a list endpoint response."""
+        for item in items:
+            if str(item.get("id")) == str(item_id):
+                return item
+        raise ValueError(f"{resource_name} with id {item_id} not found")
+
     async def get(
         self,
         endpoint: str,
@@ -137,7 +213,7 @@ class BexioClient:
     async def post(
         self,
         endpoint: str,
-        data: Dict[str, Any],
+        data: Union[Dict[str, Any], List[Any]],
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Make a POST request."""
@@ -146,7 +222,7 @@ class BexioClient:
     async def put(
         self,
         endpoint: str,
-        data: Dict[str, Any],
+        data: Union[Dict[str, Any], List[Any]],
         params: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """Make a PUT request."""
@@ -207,22 +283,72 @@ class BexioClient:
         normalized: Dict[str, Any] = dict(contact_data)
         if "email" in normalized and "mail" not in normalized:
             normalized["mail"] = normalized.pop("email")
-        # Merge with existing contact to satisfy required fields on PUT
+        allowed_fields = {
+            "nr",
+            "contact_type_id",
+            "name_1",
+            "name_2",
+            "salutation_id",
+            "salutation_form",
+            "title_id",
+            "birthday",
+            "address",
+            "street_name",
+            "house_number",
+            "address_addition",
+            "postcode",
+            "city",
+            "country_id",
+            "mail",
+            "mail_second",
+            "phone_fixed",
+            "phone_fixed_second",
+            "phone_mobile",
+            "fax",
+            "url",
+            "skype_name",
+            "remarks",
+            "language_id",
+            "contact_group_ids",
+            "contact_branch_ids",
+            "user_id",
+            "owner_id",
+        }
+        normalized = {k: v for k, v in normalized.items() if k in allowed_fields}
+        # Merge with existing contact to satisfy required fields on update.
         try:
             existing = await self.get_contact(contact_id)
-            merged: Dict[str, Any] = {**existing, **normalized}
-            return await self.put(f"/2.0/contact/{contact_id}", merged)
+            existing_filtered = {k: v for k, v in existing.items() if k in allowed_fields}
+            merged: Dict[str, Any] = {**existing_filtered, **normalized}
+            return await self.post(f"/2.0/contact/{contact_id}", merged)
         except Exception:
             # Fallback: attempt update with provided fields only
-            return await self.put(f"/2.0/contact/{contact_id}", normalized)
+            return await self.post(f"/2.0/contact/{contact_id}", normalized)
 
     async def delete_contact(self, contact_id: int) -> None:
         """Delete a contact."""
         await self.delete(f"/2.0/contact/{contact_id}")
 
-    async def search_contacts(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def search_contacts(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+        show_archived: bool = False,
+    ) -> List[Dict[str, Any]]:
         """Search contacts with criteria."""
-        return await self.post("/2.0/contact/search", criteria)
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        if show_archived:
+            params["show_archived"] = True
+        return await self.post("/2.0/contact/search", criteria, params=params)
 
     # Invoice methods
     async def list_invoices(
@@ -248,43 +374,56 @@ class BexioClient:
 
     async def create_invoice(self, invoice_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new invoice."""
+        normalized = self._normalize_sales_document_payload(invoice_data)
         # Basic validation to avoid opaque 422 errors
-        if not invoice_data.get("contact_id"):
+        if not normalized.get("contact_id"):
             raise ValueError("Invoice requires contact_id")
-        positions = invoice_data.get("positions")
+        positions = normalized.get("positions")
         if not positions or not isinstance(positions, list):
             raise ValueError(
                 "Invoice requires at least one position. Provide positions=[{" 
                 "\"type\": \"KbPositionCustom\", \"text\": \"Item description\", \"amount\": 1, \"unit_price\": 10.0}]"
             )
-        return await self.post("/2.0/kb_invoice", invoice_data)
+        return await self.post("/2.0/kb_invoice", normalized)
 
     async def update_invoice(
         self, invoice_id: int, invoice_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing invoice."""
-        return await self.put(f"/2.0/kb_invoice/{invoice_id}", invoice_data)
+        normalized = self._normalize_sales_document_payload(invoice_data)
+        return await self.post(f"/2.0/kb_invoice/{invoice_id}", normalized)
 
     async def delete_invoice(self, invoice_id: int) -> None:
         """Delete an invoice."""
         await self.delete(f"/2.0/kb_invoice/{invoice_id}")
 
-    async def search_invoices(self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200) -> List[Dict[str, Any]]:
+    async def search_invoices(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+        fallback_limit: int = 200,
+    ) -> List[Dict[str, Any]]:
         """Search invoices with criteria.
 
         Tries API search; if it fails with validation (e.g., "field not set"), falls back to
         fetching a batch and filtering client-side using '=' and 'like'.
         """
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
         try:
-            return await self.post("/2.0/kb_invoice/search", criteria)
-        except ValueError as e:
-            # Try alternate payload shape {"criteria": [...]} in case of schema variance
-            try:
-                return await self.post("/2.0/kb_invoice/search", {"criteria": criteria})
-            except ValueError:
-                # Fallback to client-side filtering
-                batch = await self.list_invoices(limit=fallback_limit)
-                return self._filter_by_criteria(batch, criteria)
+            return await self.post("/2.0/kb_invoice/search", criteria, params=params)
+        except ValueError:
+            # Fallback to client-side filtering
+            batch = await self.list_invoices(limit=fallback_limit)
+            return self._filter_by_criteria(batch, criteria)
 
     # Quote methods
     async def list_quotes(
@@ -310,15 +449,16 @@ class BexioClient:
 
     async def create_quote(self, quote_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new quote."""
+        normalized = self._normalize_sales_document_payload(quote_data)
         try:
-            return await self.post("/2.0/kb_offer", quote_data)
+            return await self.post("/2.0/kb_offer", normalized)
         except ValueError as e:
             error_msg = str(e)
             # If document_nr is required (automatic numbering disabled), generate one
-            if "422" in error_msg and "document_nr" in error_msg and "document_nr" not in quote_data:
+            if "422" in error_msg and "document_nr" in error_msg and "document_nr" not in normalized:
                 next_nr = await self._get_next_quote_document_nr()
-                quote_data["document_nr"] = next_nr
-                return await self.post("/2.0/kb_offer", quote_data)
+                normalized["document_nr"] = next_nr
+                return await self.post("/2.0/kb_offer", normalized)
             raise
 
     async def _get_next_quote_document_nr(self) -> str:
@@ -351,22 +491,35 @@ class BexioClient:
         self, quote_id: int, quote_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing quote."""
-        return await self.put(f"/2.0/kb_offer/{quote_id}", quote_data)
+        normalized = self._normalize_sales_document_payload(quote_data)
+        return await self.post(f"/2.0/kb_offer/{quote_id}", normalized)
 
     async def delete_quote(self, quote_id: int) -> None:
         """Delete a quote."""
         await self.delete(f"/2.0/kb_offer/{quote_id}")
 
-    async def search_quotes(self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200) -> List[Dict[str, Any]]:
+    async def search_quotes(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+        fallback_limit: int = 200,
+    ) -> List[Dict[str, Any]]:
         """Search quotes with criteria with robust fallbacks (see search_invoices)."""
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
         try:
-            return await self.post("/2.0/kb_offer/search", criteria)
+            return await self.post("/2.0/kb_offer/search", criteria, params=params)
         except ValueError:
-            try:
-                return await self.post("/2.0/kb_offer/search", {"criteria": criteria})
-            except ValueError:
-                batch = await self.list_quotes(limit=fallback_limit)
-                return self._filter_by_criteria(batch, criteria)
+            batch = await self.list_quotes(limit=fallback_limit)
+            return self._filter_by_criteria(batch, criteria)
 
     # Order methods
     async def list_orders(
@@ -392,21 +545,37 @@ class BexioClient:
 
     async def create_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new order."""
-        return await self.post("/2.0/kb_order", order_data)
+        normalized = self._normalize_sales_document_payload(order_data)
+        return await self.post("/2.0/kb_order", normalized)
 
     async def update_order(
         self, order_id: int, order_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing order."""
-        return await self.put(f"/2.0/kb_order/{order_id}", order_data)
+        normalized = self._normalize_sales_document_payload(order_data)
+        return await self.post(f"/2.0/kb_order/{order_id}", normalized)
 
     async def delete_order(self, order_id: int) -> None:
         """Delete an order."""
         await self.delete(f"/2.0/kb_order/{order_id}")
 
-    async def search_orders(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def search_orders(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Search orders with criteria."""
-        return await self.post("/2.0/kb_order/search", {"criteria": criteria})
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        return await self.post("/2.0/kb_order/search", criteria, params=params)
 
     # Project methods
     async def list_projects(
@@ -432,21 +601,37 @@ class BexioClient:
 
     async def create_project(self, project_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new project."""
-        return await self.post("/2.0/pr_project", project_data)
+        normalized = self._normalize_project_payload(project_data)
+        return await self.post("/2.0/pr_project", normalized)
 
     async def update_project(
         self, project_id: int, project_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing project."""
-        return await self.put(f"/2.0/pr_project/{project_id}", project_data)
+        normalized = self._normalize_project_payload(project_data)
+        return await self.post(f"/2.0/pr_project/{project_id}", normalized)
 
     async def delete_project(self, project_id: int) -> None:
         """Delete a project."""
         await self.delete(f"/2.0/pr_project/{project_id}")
 
-    async def search_projects(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def search_projects(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Search projects with criteria."""
-        return await self.post("/2.0/pr_project/search", {"criteria": criteria})
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        return await self.post("/2.0/pr_project/search", criteria, params=params)
 
     # Item methods
     async def list_items(
@@ -472,21 +657,37 @@ class BexioClient:
 
     async def create_item(self, item_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new item."""
-        return await self.post("/2.0/article", item_data)
+        normalized = self._normalize_item_payload(item_data)
+        return await self.post("/2.0/article", normalized)
 
     async def update_item(
         self, item_id: int, item_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Update an existing item."""
-        return await self.put(f"/2.0/article/{item_id}", item_data)
+        normalized = self._normalize_item_payload(item_data)
+        return await self.post(f"/2.0/article/{item_id}", normalized)
 
     async def delete_item(self, item_id: int) -> None:
         """Delete an item."""
         await self.delete(f"/2.0/article/{item_id}")
 
-    async def search_items(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def search_items(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Search items with criteria."""
-        return await self.post("/2.0/article/search", {"criteria": criteria})
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        return await self.post("/2.0/article/search", criteria, params=params)
 
     # ==================== ACCOUNTING METHODS ====================
 
@@ -509,12 +710,27 @@ class BexioClient:
         return await self.get("/2.0/accounts", params=params)
 
     async def get_account(self, account_id: int) -> Dict[str, Any]:
-        """Fetch a specific account."""
-        return await self.get(f"/2.0/accounts/{account_id}")
+        """Fetch a specific account.
 
-    async def search_accounts(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        The API has no dedicated GET /2.0/accounts/{id} endpoint, so we resolve by listing and filtering.
+        """
+        accounts = await self.list_accounts(limit=2000)
+        return self._find_item_by_id(accounts, account_id, "Account")
+
+    async def search_accounts(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
         """Search accounts with criteria."""
-        return await self.post("/2.0/accounts/search", criteria)
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        return await self.post("/2.0/accounts/search", criteria, params=params)
 
     # Account Group methods
     async def list_account_groups(
@@ -532,8 +748,12 @@ class BexioClient:
         return await self.get("/2.0/account_groups", params=params)
 
     async def get_account_group(self, account_group_id: int) -> Dict[str, Any]:
-        """Fetch a specific account group."""
-        return await self.get(f"/2.0/account_groups/{account_group_id}")
+        """Fetch a specific account group.
+
+        The API has no dedicated GET /2.0/account_groups/{id} endpoint, so we resolve by listing and filtering.
+        """
+        account_groups = await self.list_account_groups(limit=2000)
+        return self._find_item_by_id(account_groups, account_group_id, "Account group")
 
     # Tax methods
     async def list_taxes(
@@ -541,6 +761,8 @@ class BexioClient:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
         scope: Optional[str] = "active",
+        date: Optional[str] = None,
+        types: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch a list of taxes.
 
@@ -556,6 +778,10 @@ class BexioClient:
             params["offset"] = offset
         if scope is not None:
             params["scope"] = scope
+        if date is not None:
+            params["date"] = date
+        if types is not None:
+            params["types"] = types
 
         return await self.get("/3.0/taxes", params=params)
 
@@ -568,6 +794,7 @@ class BexioClient:
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch a list of currencies."""
         params = {}
@@ -575,6 +802,8 @@ class BexioClient:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
+        if date is not None:
+            params["date"] = date
 
         return await self.get("/3.0/currencies", params=params)
 
@@ -586,12 +815,12 @@ class BexioClient:
         """Create a new currency."""
         return await self.post("/3.0/currencies", currency_data)
 
-    async def get_exchange_rates(self, date: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_exchange_rates(self, currency_id: int, date: Optional[str] = None) -> List[Dict[str, Any]]:
         """Fetch exchange rates for currencies."""
         params = {}
         if date is not None:
             params["date"] = date
-        return await self.get("/3.0/currencies/exchange_rates", params=params)
+        return await self.get(f"/3.0/currencies/{currency_id}/exchange_rates", params=params)
 
     # Manual Entry / Accounting Journal methods
     async def list_manual_entries(
@@ -612,8 +841,12 @@ class BexioClient:
         return await self.get("/3.0/accounting/manual_entries", params=params)
 
     async def get_manual_entry(self, entry_id: int) -> Dict[str, Any]:
-        """Fetch a specific manual entry."""
-        return await self.get(f"/3.0/accounting/manual_entries/{entry_id}")
+        """Fetch a specific manual entry.
+
+        The API has no dedicated GET /3.0/accounting/manual_entries/{id} endpoint, so we resolve by listing and filtering.
+        """
+        entries = await self.list_manual_entries(limit=2000)
+        return self._find_item_by_id(entries, entry_id, "Manual entry")
 
     async def create_manual_entry(self, entry_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new manual entry (accounting journal booking).
@@ -675,7 +908,7 @@ class BexioClient:
 
     async def get_next_reference_number(self) -> Dict[str, Any]:
         """Get the next available reference number for manual entries."""
-        return await self.get("/3.0/accounting/manual_entries/reference_number")
+        return await self.get("/3.0/accounting/manual_entries/next_ref_nr")
 
     # Journal Report methods (read-only accounting journal/ledger)
     async def get_journal(
@@ -811,17 +1044,18 @@ class BexioClient:
         Required fields:
         - user_id: User ID performing the work
         - client_service_id: Client service ID
-        - date: Date of the timesheet entry (YYYY-MM-DD)
-        - duration: Duration in HH:MM format (e.g., "02:30")
+        - allowable_bill: Whether the time is billable
+        - tracking: Tracked time payload
 
         Optional fields:
+        - date/duration: Legacy aliases converted to tracking automatically
         - allowable_bill: Whether the time is billable (boolean)
         - text: Description text
         - contact_id: Contact ID
         - pr_project_id: Project ID
-        - tracking_type: Type of tracking (0 or 1)
         """
-        return await self.post("/2.0/timesheet", timesheet_data)
+        normalized = self._normalize_timesheet_payload(timesheet_data)
+        return await self.post("/2.0/timesheet", normalized)
 
     async def update_timesheet(
         self, timesheet_id: int, timesheet_data: Dict[str, Any]
@@ -832,7 +1066,8 @@ class BexioClient:
             timesheet_id: ID of the timesheet to update
             timesheet_data: Updated timesheet data
         """
-        return await self.put(f"/2.0/timesheet/{timesheet_id}", timesheet_data)
+        normalized = self._normalize_timesheet_payload(timesheet_data)
+        return await self.post(f"/2.0/timesheet/{timesheet_id}", normalized)
 
     async def delete_timesheet(self, timesheet_id: int) -> None:
         """Delete a timesheet entry.
@@ -843,32 +1078,59 @@ class BexioClient:
         await self.delete(f"/2.0/timesheet/{timesheet_id}")
 
     async def search_timesheets(
-        self, criteria: List[Dict[str, Any]], *, fallback_limit: int = 200
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+        fallback_limit: int = 200,
     ) -> List[Dict[str, Any]]:
         """Search timesheets with criteria."""
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
         try:
-            return await self.post("/2.0/timesheet/search", criteria)
+            return await self.post("/2.0/timesheet/search", criteria, params=params)
         except ValueError:
-            try:
-                return await self.post("/2.0/timesheet/search", {"criteria": criteria})
-            except ValueError:
-                batch = await self.list_timesheets(limit=fallback_limit)
-                return self._filter_by_criteria(batch, criteria)
+            batch = await self.list_timesheets(limit=fallback_limit)
+            return self._filter_by_criteria(batch, criteria)
 
     # Timesheet Status methods
-    async def list_timesheet_statuses(self) -> List[Dict[str, Any]]:
+    async def list_timesheet_statuses(
+        self,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Fetch a list of timesheet statuses."""
-        return await self.get("/2.0/timesheet_status")
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        return await self.get("/2.0/timesheet_status", params=params)
 
     async def get_timesheet_status(self, status_id: int) -> Dict[str, Any]:
-        """Fetch a specific timesheet status."""
-        return await self.get(f"/2.0/timesheet_status/{status_id}")
+        """Fetch a specific timesheet status.
+
+        The API has no dedicated GET /2.0/timesheet_status/{id} endpoint, so we resolve by listing and filtering.
+        """
+        statuses = await self.list_timesheet_statuses(limit=2000)
+        return self._find_item_by_id(statuses, status_id, "Timesheet status")
 
     # Client Service methods
     async def list_client_services(
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        order_by: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch a list of client services."""
         params = {}
@@ -876,31 +1138,55 @@ class BexioClient:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
 
         return await self.get("/2.0/client_service", params=params)
 
     async def get_client_service(self, client_service_id: int) -> Dict[str, Any]:
-        """Fetch a specific client service."""
-        return await self.get(f"/2.0/client_service/{client_service_id}")
+        """Fetch a specific client service.
+
+        The API has no dedicated GET /2.0/client_service/{id} endpoint, so we resolve by listing and filtering.
+        """
+        services = await self.list_client_services(limit=2000)
+        return self._find_item_by_id(services, client_service_id, "Client service")
 
     async def create_client_service(self, client_service_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new client service.
 
         Required fields:
         - name: Service name
-        - contact_id: Contact ID
+        Optional fields:
+        - default_is_billable
+        - default_price_per_hour
+        - account_id
         """
         return await self.post("/2.0/client_service", client_service_data)
 
-    async def search_client_services(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def search_client_services(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Search client services with criteria."""
-        return await self.post("/2.0/client_service/search", criteria)
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        return await self.post("/2.0/client_service/search", criteria, params=params)
 
     # Business Activity methods
     async def list_business_activities(
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        order_by: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Fetch a list of business activities (same as client services in Bexio API)."""
         params = {}
@@ -908,12 +1194,15 @@ class BexioClient:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
 
         return await self.get("/2.0/client_service", params=params)
 
     async def get_business_activity(self, business_activity_id: int) -> Dict[str, Any]:
         """Fetch a specific business activity (same as client service in Bexio API)."""
-        return await self.get(f"/2.0/client_service/{business_activity_id}")
+        activities = await self.list_business_activities(limit=2000)
+        return self._find_item_by_id(activities, business_activity_id, "Business activity")
 
     async def create_business_activity(self, business_activity_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new business activity (same as client service in Bexio API).
@@ -923,6 +1212,20 @@ class BexioClient:
         """
         return await self.post("/2.0/client_service", business_activity_data)
 
-    async def search_business_activities(self, criteria: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def search_business_activities(
+        self,
+        criteria: List[Dict[str, Any]],
+        *,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+        order_by: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """Search business activities with criteria (same as client services in Bexio API)."""
-        return await self.post("/2.0/client_service/search", criteria)
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        if order_by is not None:
+            params["order_by"] = order_by
+        return await self.post("/2.0/client_service/search", criteria, params=params)

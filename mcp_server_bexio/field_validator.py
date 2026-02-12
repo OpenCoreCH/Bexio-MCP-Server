@@ -1,6 +1,6 @@
 """General field validation and completion system for Bexio MCP server."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 
 class BexioFieldValidator:
@@ -26,6 +26,13 @@ class BexioFieldValidator:
             # Auto-fill common defaults
             if "user_id" not in nested_data:
                 nested_data["user_id"] = 1
+
+        # Normalize legacy aliases used by existing MCP prompts/tools
+        if function_name in ["create_invoice", "update_invoice", "create_quote", "update_quote", "create_project", "update_project"]:
+            if "nr" in nested_data and "document_nr" not in nested_data:
+                nested_data["document_nr"] = nested_data.pop("nr")
+            if "project_id" in nested_data and "pr_project_id" not in nested_data:
+                nested_data["pr_project_id"] = nested_data.pop("project_id")
                 
         if function_name == "create_contact":
             if "contact_type_id" not in nested_data:
@@ -73,7 +80,7 @@ class BexioFieldValidator:
                 try:
                     existing = await self.bexio_client.get_invoice(invoice_id)
                     # Fill in missing required fields from existing invoice
-                    for field in ["contact_id", "user_id", "nr"]:
+                    for field in ["contact_id", "user_id", "document_nr"]:
                         if field not in nested_data and field in existing:
                             nested_data[field] = existing[field]
                 except Exception:
@@ -86,7 +93,7 @@ class BexioFieldValidator:
                 try:
                     existing = await self.bexio_client.get_quote(quote_id)
                     # Fill in missing required fields from existing quote
-                    for field in ["contact_id", "user_id", "nr"]:
+                    for field in ["contact_id", "user_id", "document_nr"]:
                         if field not in nested_data and field in existing:
                             nested_data[field] = existing[field]
                 except Exception:
@@ -99,7 +106,7 @@ class BexioFieldValidator:
                 try:
                     existing = await self.bexio_client.get_project(project_id)
                     # Fill in missing required fields from existing project
-                    for field in ["name", "contact_id", "user_id", "pr_state_id", "pr_project_type_id", "nr"]:
+                    for field in ["name", "contact_id", "user_id", "pr_state_id", "pr_project_type_id", "document_nr"]:
                         if field not in nested_data and field in existing:
                             nested_data[field] = existing[field]
                 except Exception:
@@ -158,7 +165,7 @@ class BexioFieldValidator:
             
         try:
             # Use the correct Bexio API endpoint for taxes
-            taxes = await self.bexio_client._request("GET", "/2.0/taxes")
+            taxes = await self.bexio_client._request("GET", "/3.0/taxes")
             if taxes and len(taxes) > 0:
                 # Find the first active tax (Swiss VAT is typically id=1)
                 for tax in taxes:
@@ -171,7 +178,7 @@ class BexioFieldValidator:
             for fallback_id in [3, 1, 2]:
                 try:
                     # Test if this tax_id exists by trying to fetch it
-                    await self.bexio_client._request("GET", f"/2.0/taxes/{fallback_id}")
+                    await self.bexio_client._request("GET", f"/3.0/taxes/{fallback_id}")
                     return fallback_id
                 except Exception:
                     continue
